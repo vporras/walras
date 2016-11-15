@@ -10,65 +10,109 @@ import Control.Monad
 
 type Preference = (Float, Float)
 type Allocation = (Float, Float)
-type Trader = (Preference, Allocation)
+data Trader = Trader { name  :: String
+                     , pref  :: Preference
+                     , alloc :: Allocation
+                     } deriving (Show)
+
+
+type MRS = Float
+type Size = Float
 
 utility :: Preference -> Allocation -> Float
 utility (l1, l2) (x1, x2) = l1 * x1 + l2 * x2
 
-data Direction = Buys | Sells | NoTrade deriving (Show)
-type MRS = Float
-type Size = Float
+mrs :: Trader -> MRS
+mrs t = l1 / l2
+  where (l1, l2) = pref t
 
-tradeDirection :: Preference -> Preference -> Direction
-tradeDirection (i1, i2) (j1, j2) =
-  if i1/i2 > j1/j2 then
-    Buys
-  else if i1/i2 < j1/j2 then
-    Sells
+jointMRS :: Trader -> Trader -> MRS
+jointMRS i j = sqrt (mrs i * mrs j)
+
+getSize :: Trader -> Trader -> MRS -> Size
+getSize i j mrs =
+  if li1/li2 > lj1/lj2 then      
+    -- positive: I buying good 1 from J
+    min (mrs * xi2) xj1
+  else if li1/li2 < lj1/lj2 then 
+    -- negative: I selling good 1 to J
+    - (min xi1 (mrs * xj2))
   else
-    NoTrade
-
-tradeRate :: Preference -> Preference -> MRS
-tradeRate (i1, i2) (j1, j2) = sqrt ((i1 * j1) / (i2 * j2))
-
-tradeSize :: Direction -> MRS -> Allocation -> Allocation -> Size
-tradeSize NoTrade _ _ _ = 0
-tradeSize Buys  mrs (_, i2) (j1, _) = min (mrs * i2) j1
-tradeSize Sells mrs (i1, _) (_, j2) = min i1         (mrs * j2)
-
-trade :: Direction -> MRS -> Size -> Trader -> Trader -> (Trader, Trader)
-trade dir mrs size (pi, (xi1, xi2)) (pj, (xj1, xj2)) = 
-  ((pi, (xi1 + sign * size, xi2 - sign * mrs * size)),
-   (pj, (xj1 - sign * size, xj2 + sign * mrs * size)))
+    0 
   where
-    sign = case dir of
-      NoTrade -> 0
-      Buys    -> 1
-      Sells   -> -1
+    (li1, li2) = pref i
+    (lj1, lj2) = pref j
+    (xi1, xi2) = alloc i
+    (xj1, xj2) = alloc j
 
+changeAlloc :: Trader -> Allocation -> Trader
+changeAlloc t (dx1, dx2) =
+  -- Is this where we update preferences?
+  let (x1, x2) = alloc t in
+  t { alloc = (x1 + dx1, x2 + dx2) }
 
+trade :: Trader -> Trader -> (Trader, Trader, MRS, Size)
+trade i j = 
+  ( changeAlloc i ( size, -size / mrs)
+  , changeAlloc j (-size,  size / mrs)
+  , mrs
+  , size
+  )
+  where
+    mrs = jointMRS i j
+    -- size is units of good 1 bought by I 
+    size = getSize i j mrs
+
+doTrade :: Trader -> Trader -> IO (Trader, Trader)
+doTrade i j = do
+  let (i', j', mrs, size) = trade i j
+  putStrLn $ name i ++ " buys " ++ show size ++ " x Good 1 at rate " ++ show mrs
+  print i'
+  print j'
+  return (i', j') 
+  
 getTrader :: IO Trader
 getTrader = do
+  putStr "Name: "
+  n <- getLine
   putStr "Preference: "
   l <- getLine
   let p = read l :: Preference
   putStr "Allocation: "
   l <- getLine
   let a = read l :: Allocation
-  return (p, a)
+  return (Trader n p a)
 
-main = do
-  let i = ((1, 3),(2, 1))
-  let j = ((5, 2),(0, 4))
-  let dir = tradeDirection (fst i) (fst j) 
-  let mrs = tradeRate (fst i) (fst j)
-  let size = tradeSize dir mrs (snd i) (snd j)
-  putStrLn $ "Trader I " ++ show dir ++ " " ++ show size ++ " units of Good 1 at rate " ++ show mrs
-  let (i', j') = trade dir mrs size i j
-  putStrLn $ "I now has "
-    ++ show (fst (snd i')) ++ " units of 1 and "
-    ++ show (snd (snd i')) ++ " units of 2"
+ijkTest = do
+  let i = Trader { name = "I", pref = (1, 8), alloc = (1, 1) }
+  let j = Trader { name = "J", pref = (2, 1), alloc = (1, 1) }
+  let k = Trader { name = "K", pref = (9, 2), alloc = (1, 1) }
+  print i
+  print j
+  print k
+  (i, j) <- doTrade i j
+  (i, k) <- doTrade i k
+  (j, k) <- doTrade j k
+  (i, j) <- doTrade i j
+  (i, k) <- doTrade i k
+  (j, k) <- doTrade j k
+  return ()
+
+main = ijkTest
   
+
+-- main = do
+--   let i = Trader { pref = (1, 3), alloc = (2, 1) }
+--   let j = Trader { pref = (5, 2), alloc = (0, 4) }
+--   let k = Trader { pref = (2, 1), alloc = (2, 2) }
+--   let dir = tradeDirection (pref i) (pref j) 
+--   let mrs = tradeMRS i j
+--   let size = tradeSize dir mrs (alloc i) (alloc j)
+--   putStrLn $ "Trader I " ++ show dir ++ " " ++ show size ++ " units of Good 1 at rate " ++ show mrs
+--   let (i', j') = trade dir mrs size i j
+--   putStrLn $ "I now has "
+--     ++ show (fst (alloc i')) ++ " units of 1 and "
+--     ++ show (snd (alloc i')) ++ " units of 2"
 
 -- main = forever $ do
 --   (pi, _) <- getTrader
