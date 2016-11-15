@@ -7,6 +7,7 @@
 
 import System.Random
 import Control.Monad
+import Control.Lens
 
 type Preference = (Float, Float)
 type Allocation = (Float, Float)
@@ -63,13 +64,15 @@ trade i j =
     -- size is units of good 1 bought by I 
     size = getSize i j mrs
 
-doTrade :: Trader -> Trader -> IO (Trader, Trader)
-doTrade i j = do
+doTrade :: [Trader] -> Int -> Int -> IO [Trader]
+doTrade ts i_idx j_idx = do
+  let i = ts !! i_idx
+  let j = ts !! j_idx
   let (i', j', mrs, size) = trade i j
   putStrLn $ name i ++ " buys " ++ show size ++ " x Good 1 at rate " ++ show mrs
-  print i'
-  print j'
-  return (i', j') 
+  let ts' = (element i_idx .~ i') $ (element j_idx .~ j') $ ts
+  print ts'
+  return ts' 
   
 getTrader :: IO Trader
 getTrader = do
@@ -87,15 +90,11 @@ ijkTest = do
   let i = Trader { name = "I", pref = (1, 8), alloc = (1, 1) }
   let j = Trader { name = "J", pref = (2, 1), alloc = (1, 1) }
   let k = Trader { name = "K", pref = (9, 2), alloc = (1, 1) }
-  print i
-  print j
-  print k
-  (i, j) <- doTrade i j
-  (i, k) <- doTrade i k
-  (j, k) <- doTrade j k
-  (i, j) <- doTrade i j
-  (i, k) <- doTrade i k
-  (j, k) <- doTrade j k
+  let ts = [i,j,k]
+  print ts 
+  ts <- doTrade ts 0 1
+  ts <- doTrade ts 0 2
+  ts <- doTrade ts 1 2
   return ()
 
 main = ijkTest
