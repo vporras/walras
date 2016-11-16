@@ -1,8 +1,6 @@
 import numpy as np
 from itertools import product
 from random import sample, randint, random
-
-
 import matplotlib.pyplot as plt
 
 class Trade():
@@ -19,7 +17,6 @@ class Trade():
             origin = self.origin,
             size = self.size,
             mrs = self.joint_mrs))
-
     
     
 class Trader():
@@ -86,3 +83,5 @@ if __name__ == "__main__":
              
     plt.plot(sizes)
     plt.show()
+
+
