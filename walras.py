@@ -49,7 +49,7 @@ class Trader():
         alpha = self.preference
         if alloc[0] < 0 or alloc[1] < 0:
             return 0
-        return alloc[0]**alpha + alloc[1]**(1-alpha)
+        return alloc[0]**alpha * alloc[1]**(1-alpha)
 
     def mrs(self, dir):
         # TODO: explain the units used here
@@ -117,8 +117,8 @@ class Trader():
         size = self.get_size(other, dir, joint_mrs, abs_size)
         self.change_alloc(self.new_alloc(size, joint_mrs))
         other.change_alloc(other.new_alloc(-size, joint_mrs))
-        return Trade(self, other, size, joint_mrs)
-
+        return Trade(self, other, size, joint_mrs) 
+    
     def plot(self, rows, index):
         alpha = self.preference
         xlist = np.linspace(0, 10.0, 100)
@@ -185,7 +185,7 @@ def run(config):
         if args.verbose and abs(trade.size) > 0:
             print(trade)
     b = config.buckets
-    bsz = len(trades) / b
+    bsz = len(trades) // b
     smoothed = [sum(trades[i*bsz:(i+1)*bsz]) for i in range(b)]
 
     mrss = [t.mrs(Dir.buy) for t in traders]
@@ -206,7 +206,7 @@ def run(config):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-n", "--num-traders", type=int)
+    parser.add_argument("-n", "--num-traders", type=int, default=2)
     parser.add_argument("-t", "--traders", nargs="+", type=float,
                         help="traders as triples ALPHA X1 X2")
     parser.add_argument("-r", "--rounds", type=int, default=1)
