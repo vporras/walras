@@ -126,9 +126,9 @@ class Trader():
         X1, X2 = np.meshgrid(xlist, ylist)
         # TODO: figure out why this doesn't work
         #U = self.utility((X1, X2))
-        U = X1**alpha + X2**(1-alpha)
+        U = X1**alpha * X2**(1-alpha)
         plt.subplot(rows, 1, index)
-        cp = plt.contour(X1, X2, U, 25, colors="g")
+        cp = plt.contour(X1, X2, U, colors="g")
         plt.clabel(cp, inline=True, fontsize=10)
         plt.title("trader: %s, alpha = %f" % (self.name, alpha))
         plt.xlabel("Good 1")
@@ -147,6 +147,10 @@ class Trader():
         sellY = x2 + (sellX - x1) * -self.mrs(Dir.sell)  
         plt.plot(sellX, sellY, "--r")
 
+        plt.xlim(0, 10)
+        plt.ylim(0, 10)
+
+
     def __str__(self):
         return ("Name:{name},\n alpha=({preference}),\n alloc=({alloc})".format(
             name = self.name,
@@ -163,50 +167,64 @@ def random_traders(n):
 
 def run(config):
     trades = []
-    traders = random_traders(config.num_traders)
+    traders = []
+    if config.traders and len(config.traders) == config.num_traders * 3:
+        traders = (
+            [Trader(i,
+                    config.traders[i*3],
+                    (config.traders[i*3 + 1],
+                     config.traders[i*3 + 2]))
+             for i in range(config.num_traders)]
+        )
+    else:
+        traders = random_traders(config.num_traders)
     # wait for finish-count 0-size trades
     while (len(trades) < config.finish_count or sum(trades[-config.finish_count:]) > 0):
         trade = trade_random(traders, config.min_size)
         trades.append(abs(trade.size))
         if args.verbose and abs(trade.size) > 0:
             print(trade)
-    bucket_size = 25 
-    smoothed = zip(*[trades[n:] for n in range(config.bucket_size)])
-    smoothed = [sum(a) for a in smoothed]
+    b = config.buckets
+    bsz = len(trades) / b
+    smoothed = [sum(trades[i*bsz:(i+1)*bsz]) for i in range(b)]
 
     mrss = [t.mrs(Dir.buy) for t in traders]
     print(mrss)
 
-    plt.figure(figsize=(10, 12))
     
     if config.plot:
+        plt.figure("allocations", figsize=(10, 12))
         for i, t in enumerate(traders):
             t.plot(config.num_traders, i + 1)
         plt.subplots_adjust(hspace=.3, bottom=.05, top=.95)
         plt.show()
 
-    # plt.plot(smoothed)
-    # plt.show()
+    if config.convergence:
+        plt.figure("sum of trade sizes")
+        plt.plot(smoothed)
+        plt.show()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-n", "--num-traders", type=int)
+    parser.add_argument("-t", "--traders", nargs="+", type=float,
+                        help="traders as triples ALPHA X1 X2")
     parser.add_argument("-r", "--rounds", type=int, default=1)
     parser.add_argument("-m", "--min-size", type=float, default=0.1,
                         help="minimum size of trade (default: 0.1)")
-    parser.add_argument("-f", "--finish-count", type=int, default=10,
-                        help="number of empty trades to finish a round (default: 10)")
+    parser.add_argument("-f", "--finish-count", type=int, default=25,
+                        help="number of empty trades to finish a round (default: 25)")
     parser.add_argument("-s", "--seed", default=str(random.randint(0, 10000)),
                         help="seed to initialize PRNG")
     parser.add_argument("-p", "--plot", action="store_true", help="plot the traders")
     parser.add_argument("-v", "--verbose", action="store_true", help="print each trade")
-    parser.add_argument("-b", "--bucket-size", type=int, default=25,
-                        help="bucket size for convergence graph smoothing")
+    parser.add_argument("-b", "--buckets", type=int, default=25,
+                        help="number of buckets for convergence graph smoothing (default: 25)")
+    parser.add_argument("-c", "--convergence", action="store_true", help="plot convergence")
     args = parser.parse_args()
     random.seed(args.seed)
     print("seed: " + args.seed)
     args
-    print(args)
     run(args)
 
 
