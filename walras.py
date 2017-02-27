@@ -5,6 +5,10 @@ import matplotlib.pyplot as plt
 import argparse
 from enum import Enum
 
+# TODO pick good defaults here
+BUY_CONSTRAINT = 10
+SELL_CONSTRAINT = 0.1
+
 class Trade():
     
     def __init__(self, source, origin, size, joint_mrs):
@@ -34,6 +38,9 @@ class Dir(Enum):
         else:
             return Dir.none
 
+def gmean(x, y):
+    return (x * y) ** 0.5
+
 class Trader():
     """Trader class"""
 
@@ -43,25 +50,46 @@ class Trader():
         self.endowment = endowment
         self.allocs = [endowment]
         self.alloc = endowment
-        # TODO pick good defaults here
-        self.buy_constraint  = 10
-        self.sell_constraint = 0.1
+        self.buy_constraint  = BUY_CONSTRAINT
+        self.sell_constraint = SELL_CONSTRAINT
         self.last_trade_mrs = None
 
+        # these include constraints, du and dw from their creation
+        self.old_buy = None
+        self.old_sell = None
+
     def reset(self):
-        dw = self.d_wealth()
-        if dw < 0:
-            if self.alloc[0] > self.endowment[0]:
-                # net buying
-                self.buy_constraint = (self.buy_constraint*self.last_trade_mrs) ** 0.5
-            else:
-                # net selling
-                self.sell_constraint = (self.sell_constraint*self.last_trade_mrs) ** 0.5
+        self.update_constraints()
 
         self.last_trade_mrs = None
         self.allocs = [self.endowment]
         self.alloc = self.endowment
 
+    # should_tighten is true if a net buyer and this is a buy constraint or vice versa
+    def pick_constraint(self, constraint, old, du, dw, should_tighten):
+        if old != None:
+            old_constraint, odu, odw = old
+            if constraint != old_constraint:
+                if du < odu or (du == odu and dw < odw):
+                    return (gmean(constraint, old_constraint), (old_constraint, odu, odw))
+                else:
+                    return (constraint, (constraint, du, dw))
+            
+        if dw < 0 and should_tighten:
+            # return (self.last_trade_mrs, (constraint, du, dw))
+            return (gmean(constraint, self.last_trade_mrs), (constraint, du, dw))
+
+        else:
+            return (constraint, (constraint, du, dw))
+
+    def update_constraints(self):
+        dw = self.d_wealth()
+        du = self.d_utility()
+        self.buy_constraint, self.old_buy = self.pick_constraint(
+            self.buy_constraint, self.old_buy, du, dw, self.alloc[0] > self.endowment[0])
+        self.sell_constraint, self.old_sell = self.pick_constraint(
+            self.sell_constraint, self.old_sell, du, dw, self.alloc[0] < self.endowment[0])
+        
     def utility(self, alloc):
         alpha = self.preference
         x1, x2 = alloc
@@ -69,8 +97,21 @@ class Trader():
             return 0
         return x1**alpha * x2**(1-alpha)
 
+    def d_utility(self):
+        return self.utility(self.alloc) - self.utility(self.endowment)
+
+    def wealth(self, alloc):
+        x1, x2 = alloc
+        return x1 + x2 * self.last_trade_mrs
+        
+    # returns the total change in wealth this round, in terms of x1
+    def d_wealth(self):
+        if self.last_trade_mrs != None:
+            return self.wealth(self.alloc) - self.wealth(self.endowment)
+        else:
+            return 0
+
     def mrs(self, dir):
-        # TODO: explain the units used here
         # This is the exchange rate between x1 and x2, in terms of x1.
         # eg if mrs(Dir.buy) == 5.0, then the trader is willing to pay up to 5 units
         #   of x2 in order to get one unit of x1
@@ -93,16 +134,15 @@ class Trader():
        elif self.mrs(Dir.sell) < other.mrs(Dir.buy):
            return Dir.sell
        else:
-           # print("constrained")
            return Dir.none
 
     def joint_mrs(self, other, dir):
         if dir == Dir.none:
             return 1
-        return (self.mrs(dir) * other.mrs(dir.inv())) ** 0.5
-        # return random.choice([self.mrs(dir), other.mrs(dir.inv())])
+        # convergence must better than using self.mrs
+        return gmean(self.mrs(dir), other.mrs(dir.inv()))
         # return random.uniform(self.mrs(dir), other.mrs(dir.inv()))
-        # return self.mrs(dir)
+        # return random.uniform(self.buy_constraint, self.sell_constraint)
 
     def new_alloc(self, size, joint_mrs):
         # positive size is potentially buying good 1
@@ -136,16 +176,6 @@ class Trader():
         self.alloc = new_alloc
         self.allocs.append(self.alloc)
 
-    def wealth(self, alloc):
-        x1, x2 = alloc
-        return x1 + x2 * self.last_trade_mrs
-        
-    # returns the total change in wealth this round, in terms of x1
-    def d_wealth(self):
-        try:
-            return self.wealth(self.alloc) - self.wealth(self.allocs[0])
-        except TypeError:
-            return 0
     
     def trade(self, other, min_size, dynamic):
         dir = self.get_dir(other) 
@@ -204,7 +234,7 @@ def random_traders(n):
     return [Trader(i, random.random(), (random.random(),random.random()))
             for i in range(n)]
     
-def do_round(config, traders):
+def do_round(config, traders, is_last):
     trades = []
 
     # wait for until the last finish-count trades have been 0-size
@@ -218,16 +248,23 @@ def do_round(config, traders):
     bsz = len(trades) // b
     smoothed = [sum(trades[i*bsz:(i+1)*bsz]) for i in range(b)]
 
+    def pretty(l):
+        return " ".join(["%.3f" % x for x in l])
+
     mrss = [t.mrs(Dir.buy) for t in traders]
-    print("Final MRSs:")
-    print(mrss)
-
     dw = [t.d_wealth() for t in traders]
-    print("Final changes in wealth:")
-    print(dw)
-    print(sum(dw))
+    du = [t.d_utility() for t in traders]
+    C = np.log(BUY_CONSTRAINT) - np.log(SELL_CONSTRAINT)
+    c = [(np.log(t.buy_constraint) - np.log(t.sell_constraint)) / C for t in traders]
+    print("W: %.3f U: %.3f M: %.3f C: %.3f" %
+          (sum(np.abs(dw)), sum(du), np.std(mrss), np.mean(c)))
 
-    if config.plot:
+    if is_last:
+        print("mrss:", pretty(mrss))
+        print("dw:  ", pretty(dw))
+        print("du:  ", pretty(du))
+
+    if config.plot and is_last or config.plot_all:
         plt.figure("allocations over time", figsize=(10, 12))
 
         # only plot first 4 traders due to screen size
@@ -237,7 +274,7 @@ def do_round(config, traders):
         plt.subplots_adjust(hspace=.3, bottom=.05, top=.95)
         plt.show()
 
-    if config.convergence:
+    if config.convergence and is_last:
         plt.figure("sum of trade sizes")
         plt.plot(smoothed)
         plt.show()
@@ -257,7 +294,7 @@ def run(config):
         traders = random_traders(config.num_traders)
         
     for i in range(config.rounds):
-        do_round(config, traders)
+        do_round(config, traders, i == config.rounds - 1)
     
         for t in traders:
             t.reset()
@@ -275,7 +312,8 @@ if __name__ == "__main__":
                         help="number of empty trades to finish a round (default: 25)")
     parser.add_argument("-s", "--seed", default=str(random.randint(0, 10000)),
                         help="seed to initialize PRNG")
-    parser.add_argument("-p", "--plot", action="store_true", help="plot the traders")
+    parser.add_argument("-p", "--plot", action="store_true", help="plot the allocations")
+    parser.add_argument("-P", "--plot-all", action="store_true", help="plot the allocations every round ")
     parser.add_argument("-v", "--verbose", action="store_true", help="print each trade")
     parser.add_argument("-b", "--buckets", type=int, default=25,
                         help="number of buckets for convergence graph smoothing (default: 25)")
