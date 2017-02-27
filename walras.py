@@ -154,32 +154,6 @@ class Trader():
         plt.xlim(0, 1)
         plt.ylim(0, 1)
         
-    def plot_inverse(self):
-        alpha = self.preference
-        xlist = np.linspace(0, 1.0, 100)
-        ylist = np.linspace(0, 1.0, 100)
-        X1, X2 = np.meshgrid(xlist, ylist)
-        X1 = 1 - X1
-        X2 = 1 - X2
-        U = np.array([[self.utility((x, y)) for x in xlist] for y in ylist])
-
-        cp = plt.contour(X1, X2, U, colors="r")
-        plt.clabel(cp, inline=True, fontsize=10)
-        
-        x1s, x2s = zip(*self.allocs)
-        plt.plot(x2s, x1s, ".-")
-
-        x1, x2 = self.alloc
-        plt.plot([x2], [x1], "bo")
-
-        buyX = np.linspace(x1, x1 + .1, 5)
-        buyY = x2 + (buyX - x1) * -self.mrs(Dir.buy)  
-        plt.plot(buyX, buyY, "--b")
-
-        sellX = np.linspace(x1 - .1, x1, 5)
-        sellY = x2 + (sellX - x1) * -self.mrs(Dir.sell)  
-        plt.plot(sellX, sellY, "--r")
-
     def __str__(self):
         return ("Name:{name},\n alpha=({preference}),\n alloc=({alloc})".format(
             name = self.name,
@@ -224,10 +198,7 @@ def run(config):
     if config.plot:
         plt.figure("allocations over time", figsize=(10, 12))
 
-        # traders[0].plot(config.num_traders, 1)
-        # traders[1].plot_inverse()
-
-        # only plot first 4
+        # only plot first 4 traders due to screen size
         n_to_plot = min(len(traders), 4)
         for i, t in enumerate(traders[:n_to_plot]):
             t.plot(n_to_plot, i + 1)
