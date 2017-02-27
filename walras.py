@@ -40,10 +40,27 @@ class Trader():
     def __init__(self, name, preference, endowment):
         self.name = name
         self.preference = preference
+        self.endowment = endowment
         self.allocs = [endowment]
         self.alloc = endowment
-        self.buy_constraint  = 100
-        self.sell_constraint = 0.01
+        # TODO pick good defaults here
+        self.buy_constraint  = 10
+        self.sell_constraint = 0.1
+        self.last_trade_mrs = None
+
+    def reset(self):
+        dw = self.d_wealth()
+        if dw < 0:
+            if self.alloc[0] > self.endowment[0]:
+                # net buying
+                self.buy_constraint = (self.buy_constraint*self.last_trade_mrs) ** 0.5
+            else:
+                # net selling
+                self.sell_constraint = (self.sell_constraint*self.last_trade_mrs) ** 0.5
+
+        self.last_trade_mrs = None
+        self.allocs = [self.endowment]
+        self.alloc = self.endowment
 
     def utility(self, alloc):
         alpha = self.preference
@@ -54,6 +71,9 @@ class Trader():
 
     def mrs(self, dir):
         # TODO: explain the units used here
+        # This is the exchange rate between x1 and x2, in terms of x1.
+        # eg if mrs(Dir.buy) == 5.0, then the trader is willing to pay up to 5 units
+        #   of x2 in order to get one unit of x1
         alpha = self.preference
         x1, x2 = self.alloc
         if x1 == 0:
@@ -73,7 +93,7 @@ class Trader():
        elif self.mrs(Dir.sell) < other.mrs(Dir.buy):
            return Dir.sell
        else:
-           print("constrained")
+           # print("constrained")
            return Dir.none
 
     def joint_mrs(self, other, dir):
@@ -116,14 +136,30 @@ class Trader():
         self.alloc = new_alloc
         self.allocs.append(self.alloc)
 
+    def wealth(self, alloc):
+        x1, x2 = alloc
+        return x1 + x2 * self.last_trade_mrs
+        
+    # returns the total change in wealth this round, in terms of x1
+    def d_wealth(self):
+        try:
+            return self.wealth(self.alloc) - self.wealth(self.allocs[0])
+        except TypeError:
+            return 0
+    
     def trade(self, other, min_size, dynamic):
         dir = self.get_dir(other) 
         joint_mrs = self.joint_mrs(other, dir)
         size = self.get_size(other, dir, joint_mrs, min_size, dynamic)
-        self.change_alloc(self.new_alloc(size, joint_mrs))
-        other.change_alloc(other.new_alloc(-size, joint_mrs))
+
+        if abs(size) > 0:
+            self.change_alloc(self.new_alloc(size, joint_mrs))
+            other.change_alloc(other.new_alloc(-size, joint_mrs))
+            self.last_trade_mrs = joint_mrs
+            other.last_trade_mrs = joint_mrs
+            
         return Trade(self, other, size, joint_mrs) 
-    
+        
     def plot(self, rows, index):
         alpha = self.preference
         xlist = np.linspace(0, 1.0, 100)
@@ -167,33 +203,29 @@ def trade_random(traders, min_size, dynamic):
 def random_traders(n):
     return [Trader(i, random.random(), (random.random(),random.random()))
             for i in range(n)]
-
-def run(config):
+    
+def do_round(config, traders):
     trades = []
-    traders = []
-    if config.traders and len(config.traders) % 3 == 0:
-        config.num_traders = len(config.traders) // 3
-        traders = (
-            [Trader(i,
-                    config.traders[i*3],
-                    (config.traders[i*3 + 1],
-                     config.traders[i*3 + 2]))
-             for i in range(config.num_traders)]
-        )
-    else:
-        traders = random_traders(config.num_traders)
+
     # wait for until the last finish-count trades have been 0-size
     while (len(trades) < config.finish_count or sum(trades[-config.finish_count:]) > 0):
         trade = trade_random(traders, config.min_size, config.dynamic)
         trades.append(abs(trade.size))
-        if args.verbose:# and abs(trade.size) > 0:
+        if args.verbose and abs(trade.size) > 0:
             print(trade)
+
     b = config.buckets
     bsz = len(trades) // b
     smoothed = [sum(trades[i*bsz:(i+1)*bsz]) for i in range(b)]
 
     mrss = [t.mrs(Dir.buy) for t in traders]
+    print("Final MRSs:")
     print(mrss)
+
+    dw = [t.d_wealth() for t in traders]
+    print("Final changes in wealth:")
+    print(dw)
+    print(sum(dw))
 
     if config.plot:
         plt.figure("allocations over time", figsize=(10, 12))
@@ -209,6 +241,27 @@ def run(config):
         plt.figure("sum of trade sizes")
         plt.plot(smoothed)
         plt.show()
+
+def run(config):
+    traders = []
+    if config.traders and len(config.traders) % 3 == 0:
+        config.num_traders = len(config.traders) // 3
+        traders = (
+            [Trader(i,
+                    config.traders[i*3],
+                    (config.traders[i*3 + 1],
+                     config.traders[i*3 + 2]))
+             for i in range(config.num_traders)]
+        )
+    else:
+        traders = random_traders(config.num_traders)
+        
+    for i in range(config.rounds):
+        do_round(config, traders)
+    
+        for t in traders:
+            t.reset()
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
