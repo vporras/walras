@@ -121,6 +121,7 @@ class Trader():
 
     def plot(self, rows, index):
         alpha = self.preference
+        print(alpha)
         xlist = np.linspace(0, 10.0, 100)
         ylist = np.linspace(0, 10.0, 100)
         X1, X2 = np.meshgrid(xlist, ylist)
@@ -183,9 +184,12 @@ def run(config):
         trade = trade_random(traders, config.min_size)
         trades.append(abs(trade.size))
         if args.verbose and abs(trade.size) > 0:
-            print(trade)
+            print(traders[0].utility((5,5)))
+            # print(traders[1].utility(traders[1].alloc))
+            # print(traders[1].alloc)
+            # print(trade)
     b = config.buckets
-    bsz = len(trades) / b
+    bsz = len(trades) // b
     smoothed = [sum(trades[i*bsz:(i+1)*bsz]) for i in range(b)]
 
     mrss = [t.mrs(Dir.buy) for t in traders]
