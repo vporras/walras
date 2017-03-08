@@ -44,51 +44,100 @@ def gmean(x, y):
 class Trader():
     """Trader class"""
 
-    def __init__(self, name, preference, endowment):
+    def __init__(self, name, preference, endowment, config):
         self.name = name
         self.preference = preference
         self.endowment = endowment
         self.allocs = [endowment]
         self.alloc = endowment
-        self.buy_constraint  = BUY_CONSTRAINT
-        self.sell_constraint = SELL_CONSTRAINT
         self.last_trade_mrs = None
+        self.round = 0
 
-        # these include constraints, du and dw from their creation
-        self.old_buy = None
-        self.old_sell = None
+        # these lists store histories of constraints by round
+        self.buy_constraints  = [BUY_CONSTRAINT]
+        self.sell_constraints = [SELL_CONSTRAINT]
+        self.du = []
+        self.dw = []
+        # these store the round with which the current constraint is compared
+        self.buy_lookbacks = [0]
+        self.sell_lookbacks = [0]
+        
+        self.constraint_mode = config.constraint_mode
+        self.reversion = config.reversion
+        self.constraint_factor = config.constraint_factor
 
     def reset(self):
         self.update_constraints()
 
+        self.round = self.round + 1
         self.last_trade_mrs = None
         self.allocs = [self.endowment]
         self.alloc = self.endowment
+        
+    def backtrack(self, round, lookbacks):
+        du = self.du
+        dw = self.dw
+        next = round
+        while du[next] >= du[round] and round > 0:
+            next, round = lookbacks[next], next
+        return round
 
-    # should_tighten is true if a net buyer and this is a buy constraint or vice versa
-    def pick_constraint(self, constraint, old, du, dw, should_tighten):
-        if old != None:
-            old_constraint, odu, odw = old
-            if constraint != old_constraint:
-                if du < odu or (du == odu and dw < odw):
-                    return (gmean(constraint, old_constraint), (old_constraint, odu, odw))
+    def pick_constraint(self, constraints, lookbacks, dir, net_buyer):
+        cur = self.round
+        du = self.du
+        dw = self.dw
+        # Checking whether improvement was successful, and maybe reverting
+        if cur > 0:
+            old = lookbacks[cur]
+            # TODO: do we want to revert even if constraints are the same?
+            if constraints[cur] != constraints[old]:
+                if du[cur] < du[old] or (du[cur] == du[old] and dw[cur] < dw[old]):
+                    if self.reversion == "mean":
+                        constraints.append(gmean(constraints[cur], constraints[old]))
+                        lookbacks.append(old)
+                    elif self.reversion == "total":
+                        constraints.append(constraints[old])
+                        # TODO: which should we lookback to?
+                        lookbacks.append(lookbacks[old])
+                    elif self.reversion == "backtrack":
+                        r = self.backtrack(old, lookbacks)
+                        constraints.append(constraints[r])
+                        # TODO: which should we lookback to? cur, old, lb[r]?
+                        lookbacks.append(lookbacks[r])
+                    #elif self.reversion == "random":
+                    else:
+                        r = random.randint(0, old)
+                        constraints.append(constraints[r])
+                        # TODO: which should we lookback to? cur, old, lb[r]?
+                        lookbacks.append(lookbacks[r])
+                # success!
                 else:
-                    return (constraint, (constraint, du, dw))
+                    constraints.append(constraints[cur])
+                    lookbacks.append(cur)
+                return
             
-        if dw < 0 and should_tighten:
-            # return (self.last_trade_mrs, (constraint, du, dw))
-            return (gmean(constraint, self.last_trade_mrs), (constraint, du, dw))
-
+        # Changing constraints if I lost wealth
+        if dw[cur] < 0 and ((net_buyer and dir == Dir.buy) or (not net_buyer and dir == Dir.sell)):
+            lookbacks.append(cur)
+            if self.constraint_mode == "last":
+                constraints.append(self.last_trade_mrs)
+            elif self.constraint_mode == "mean":
+                constraints.append(gmean(constraints[cur], self.last_trade_mrs))
+            # elif self.constraint_mode == "fixed":
+            else:
+                factor = 1 - self.constraint_factor if net_buyer else 1 + self.constraint_factor
+                constraints.append(constraints[cur] * factor)
+        # Don't change anything
         else:
-            return (constraint, (constraint, du, dw))
+            lookbacks.append(lookbacks[cur])
+            constraints.append(constraints[cur])
 
     def update_constraints(self):
-        dw = self.d_wealth()
-        du = self.d_utility()
-        self.buy_constraint, self.old_buy = self.pick_constraint(
-            self.buy_constraint, self.old_buy, du, dw, self.alloc[0] > self.endowment[0])
-        self.sell_constraint, self.old_sell = self.pick_constraint(
-            self.sell_constraint, self.old_sell, du, dw, self.alloc[0] < self.endowment[0])
+        self.dw.append(self.d_wealth())
+        self.du.append(self.d_utility())
+        net_buyer = self.alloc[0] > self.endowment[0]
+        self.pick_constraint(self.buy_constraints, self.buy_lookbacks, Dir.buy, net_buyer)
+        self.pick_constraint(self.sell_constraints, self.sell_lookbacks, Dir.sell, net_buyer)
         
     def utility(self, alloc):
         alpha = self.preference
@@ -102,7 +151,11 @@ class Trader():
 
     def wealth(self, alloc):
         x1, x2 = alloc
-        return x1 + x2 * self.last_trade_mrs
+        if self.last_trade_mrs != None:
+            return x1 + x2 * self.last_trade_mrs
+        else:
+            # TODO: is this the right fallback?
+            return x1 + x2
         
     # returns the total change in wealth this round, in terms of x1
     def d_wealth(self):
@@ -118,12 +171,12 @@ class Trader():
         alpha = self.preference
         x1, x2 = self.alloc
         if x1 == 0:
-            return self.buy_constraint
+            return self.buy_constraints[self.round]
         mrs = alpha*x2/((1-alpha)*x1)
         if dir == Dir.buy:
-            return min(mrs, self.buy_constraint)
+            return min(mrs, self.buy_constraints[self.round])
         elif dir == Dir.sell:
-            return max(mrs, self.sell_constraint)
+            return max(mrs, self.sell_constraints[self.round])
         else:
             # should be unreachable!
             assert(False)
@@ -142,7 +195,7 @@ class Trader():
         # convergence must better than using self.mrs
         return gmean(self.mrs(dir), other.mrs(dir.inv()))
         # return random.uniform(self.mrs(dir), other.mrs(dir.inv()))
-        # return random.uniform(self.buy_constraint, self.sell_constraint)
+        # return random.uniform(self.buy_constraints[self.round], self.sell_constraint[self.round])
 
     def new_alloc(self, size, joint_mrs):
         # positive size is potentially buying good 1
@@ -230,10 +283,6 @@ def trade_random(traders, min_size, dynamic):
     a,b = random.sample(traders,2)
     return(a.trade(b, min_size, dynamic))
 
-def random_traders(n):
-    return [Trader(i, random.random(), (random.random(),random.random()))
-            for i in range(n)]
-    
 def do_round(config, traders, is_last):
     trades = []
 
@@ -250,14 +299,17 @@ def do_round(config, traders, is_last):
 
     def pretty(l):
         return " ".join(["%.3f" % x for x in l])
+    
+
+    total_wealth = sum([t.wealth(t.alloc) for t in traders])
 
     mrss = [t.mrs(Dir.buy) for t in traders]
-    dw = [t.d_wealth() for t in traders]
+    dw = [t.d_wealth() / total_wealth for t in traders]
     du = [t.d_utility() for t in traders]
     C = np.log(BUY_CONSTRAINT) - np.log(SELL_CONSTRAINT)
-    c = [(np.log(t.buy_constraint) - np.log(t.sell_constraint)) / C for t in traders]
-    print("W: %.3f U: %.3f M: %.3f C: %.3f" %
-          (sum(np.abs(dw)), sum(du), np.std(mrss), np.mean(c)))
+    c = [(np.log(t.buy_constraints[t.round]) - np.log(t.sell_constraints[t.round])) / C for t in traders]
+    res = (sum(np.abs(dw)) / 2, sum(du), np.std(mrss), np.mean(c))
+    print("W: %.3f U: %.3f M: %.3f C: %.3f" % res)
 
     if is_last:
         print("mrss:", pretty(mrss))
@@ -279,32 +331,64 @@ def do_round(config, traders, is_last):
         plt.plot(smoothed)
         plt.show()
 
+    return res
+
+def random_traders(n, config):
+    return [Trader(i, random.random(), (random.random(),random.random()), config)
+            for i in range(n)]
+    
 def run(config):
     traders = []
-    if config.traders and len(config.traders) % 3 == 0:
-        config.num_traders = len(config.traders) // 3
-        traders = (
-            [Trader(i,
-                    config.traders[i*3],
-                    (config.traders[i*3 + 1],
-                     config.traders[i*3 + 2]))
-             for i in range(config.num_traders)]
-        )
+    if config.trader_file:
+        with open(config.trader_file) as file:
+            i = 0
+            for line in file:
+                strs = line.split()
+                traders.append(Trader(i, float(strs[0]), (float(strs[1]), float(strs[2])), config)) 
+                i += 1
+        config.num_traders = len(traders)
     else:
-        traders = random_traders(config.num_traders)
+        traders = random_traders(config.num_traders, config)
+
+    wealths         = np.empty([config.rounds])
+    utilities       = np.empty([config.rounds])
+    mrs_convergence = np.empty([config.rounds])
+    constrainedness = np.empty([config.rounds])
         
     for i in range(config.rounds):
-        do_round(config, traders, i == config.rounds - 1)
+        w, u, m, c = do_round(config, traders, i == config.rounds - 1)
+        wealths[i] = w
+        utilities[i] = u
+        mrs_convergence[i] = m
+        constrainedness[i] = c
     
         for t in traders:
             t.reset()
+
+    if config.rounds > 1:
+        utilities /= max(utilities)
+        mrs_convergence /= max(mrs_convergence)
+        constrainedness /= max(constrainedness)
+        plt.figure("multiround data", figsize=(10,8))
+        plt.plot(wealths,         label="wealth transfers (%)")
+        plt.plot(utilities,       label="utility gains")
+        plt.plot(mrs_convergence, label="mrs convergence (stddev)")
+        plt.plot(constrainedness, label="constrainedness %")
+
+    
+        ax = plt.gca()
+        cur = ax.get_position()
+        ax.set_position([cur.x0, cur.y0 + cur.height * 0.1, cur.width, cur.height * 0.9])
+
+        ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05), ncol=2)
+
+        plt.show()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-n", "--num-traders", type=int, default=2)
-    parser.add_argument("-t", "--traders", nargs="+", type=float,
-                        help="traders as triples ALPHA X1 X2")
+    parser.add_argument("-t", "--trader-file", help="file to load traders from")
     parser.add_argument("-r", "--rounds", type=int, default=1)
     parser.add_argument("-m", "--min-size", type=float, default=0.01,
                         help="minimum size of trade (default: 0.01)")
@@ -319,8 +403,20 @@ if __name__ == "__main__":
                         help="number of buckets for convergence graph smoothing (default: 25)")
     parser.add_argument("-c", "--convergence", action="store_true", help="plot convergence")
     parser.add_argument("-d", "--dynamic", action="store_true", help="dynamic size (binary search)")
+    parser.add_argument("--constraint-mode", choices=["last", "mean", "fixed"], default="mean",
+                        help="how new constraints are calculated. last is the last price, mean (default) is " \
+                        "the mean of the last price and current constraint," \
+                        "fixed is a fixed percentage of the current constraint")
+    parser.add_argument("--reversion", choices=["mean", "total", "backtrack", "random"], default="mean",
+                        help="revert bad constraints to mean (default) of old and new constraint, totally " \
+                        "to the old constraint, or randomly" )
+    parser.add_argument("--constraint-factor", type=float, default=0.1,
+                        help="factor used for fixed constraining")
     args = parser.parse_args()
     random.seed(args.seed)
     print("seed: " + args.seed)
     args
     run(args)
+
+
+
