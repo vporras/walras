@@ -5,11 +5,14 @@ import argparse
 import sys
 import os
 import json
+from time import time
 from enum import Enum
 
 # TODO pick good defaults here
 BUY_CONSTRAINT = 10
 SELL_CONSTRAINT = 0.1
+
+bench_time = 0
 
 class Trade():
     
@@ -63,12 +66,13 @@ class Trader():
         # these store the round with which the current constraint is compared
         self.buy_lookbacks = [0]
         self.sell_lookbacks = [0]
-        
+
         self.constraint_mode = config.constraint_mode
         self.reversion = config.reversion
         self.constraint_factor = config.constraint_factor
         self.backtracks = config.backtracks
         self.backtrack_prob = config.backtrack_prob
+        self.backtrack_threshold = config.backtrack_threshold
 
     def reset(self):
         self.update_constraints()
@@ -82,11 +86,11 @@ class Trader():
         cur = self.round
         du = self.du
         dw = self.dw
+        th = self.backtrack_threshold 
         # Check [backtrack] days in the past and revert if utility has fallen
-        # TODO: randomize this? use epsilon? use moving average?
         for bt in self.backtracks:
             if cur >= bt:
-                if du[cur] < du[cur - bt] and random.random() < self.backtrack_prob:
+                if du[cur] < du[cur - bt] * th and random.random() < self.backtrack_prob:
                     constraints.append(constraints[cur - bt])
                     lookbacks.append(lookbacks[cur - bt])
                     return
@@ -94,7 +98,6 @@ class Trader():
         # Checking whether improvement was successful, and maybe reverting
         if cur > 0:
             old = lookbacks[cur]
-            # TODO: do we want to revert even if constraints are the same?
             if constraints[cur] != constraints[old]:
                 if du[cur] < du[old] or (du[cur] == du[old] and dw[cur] < dw[old]):
                     if self.reversion == "mean":
@@ -102,19 +105,11 @@ class Trader():
                         lookbacks.append(old)
                     elif self.reversion == "total":
                         constraints.append(constraints[old])
-                        # TODO: which should we lookback to?
                         lookbacks.append(lookbacks[old])
-                    # elif self.reversion == "backtrack":
-                    #     r = self.backtrack(old, lookbacks)
-                    #     constraints.append(constraints[r])
-                    #     # TODO: which should we lookback to? cur, old, lb[r]?
-                    #     lookbacks.append(lookbacks[r])
-
                     # elif self.reversion == "random":
                     else:
                         r = random.randint(0, old)
                         constraints.append(constraints[r])
-                        # TODO: which should we lookback to? cur, old, lb[r]?
                         lookbacks.append(lookbacks[r])
                 # success!
                 else:
@@ -182,11 +177,9 @@ class Trader():
         mrs = alpha*x2/((1-alpha)*x1)
         if dir == Dir.buy:
             return min(mrs, self.buy_constraints[self.round])
-        elif dir == Dir.sell:
-            return max(mrs, self.sell_constraints[self.round])
+        #elif dir == Dir.sell:
         else:
-            # should be unreachable!
-            assert(False)
+            return max(mrs, self.sell_constraints[self.round])
     
     def get_dir(self, other):
        if self.mrs(Dir.buy) > other.mrs(Dir.sell):
@@ -199,7 +192,6 @@ class Trader():
     def joint_mrs(self, other, dir):
         if dir == Dir.none:
             return 1
-        # convergence must better than using self.mrs
         return gmean(self.mrs(dir), other.mrs(dir.inv()))
         # return random.uniform(self.mrs(dir), other.mrs(dir.inv()))
         # return random.uniform(self.buy_constraints[self.round], self.sell_constraint[self.round])
@@ -238,17 +230,20 @@ class Trader():
 
     
     def trade(self, other, min_size, dynamic):
+        global bench_time
         dir = self.get_dir(other) 
+        start = time()
         joint_mrs = self.joint_mrs(other, dir)
+        bench_time += time() - start
         size = self.get_size(other, dir, joint_mrs, min_size, dynamic)
 
-        if abs(size) > 0:
+        if size != 0:
             self.change_alloc(self.new_alloc(size, joint_mrs))
             other.change_alloc(other.new_alloc(-size, joint_mrs))
             self.last_trade_mrs = joint_mrs
             other.last_trade_mrs = joint_mrs
             
-        return Trade(self, other, size, joint_mrs) 
+        return size
         
     def plot(self, rows, index):
         alpha = self.preference
@@ -291,22 +286,16 @@ def trade_random(traders, min_size, dynamic):
     return(a.trade(b, min_size, dynamic))
 
 def do_round(config, traders, round):
-    trades = []
-
-    # wait for until the last finish-count trades have been 0-size
-    while (len(trades) < config.finish_count or sum(trades[-config.finish_count:]) > 0):
-        trade = trade_random(traders, config.min_size, config.dynamic)
-        trades.append(abs(trade.size))
-        # if config.verbose and abs(trade.size) > 0:
-        #     print(trade)
-
-    b = config.buckets
-    bsz = len(trades) // b
-    smoothed = [sum(trades[i*bsz:(i+1)*bsz]) for i in range(b)]
-
-    def pretty(l):
-        return " ".join(["%.3f" % x for x in l])
-    
+    # wait for until the last [finish_count] trades have been 0-size
+    consecutive_zero_trades = 0
+    total_trades = 0
+    while consecutive_zero_trades < config.finish_count:
+        size = trade_random(traders, config.min_size, config.dynamic)
+        total_trades += 1
+        if size == 0:
+            consecutive_zero_trades += 1
+        else:
+            consecutive_zero_trades = 0
 
     total_wealth = sum([t.wealth(t.alloc) for t in traders])
 
@@ -314,9 +303,12 @@ def do_round(config, traders, round):
     dw = [t.d_wealth() / total_wealth for t in traders]
     du = [t.d_utility() for t in traders]
     C = np.log(BUY_CONSTRAINT) - np.log(SELL_CONSTRAINT)
-    c = [(np.log(t.buy_constraints[t.round]) - np.log(t.sell_constraints[t.round])) / C for t in traders]
-    res = (round, sum(np.abs(dw)) / 2, sum(du), np.std(mrss), np.mean(c), len(trades)/config.num_traders)
+    c = [(np.log(t.buy_constraints[t.round]) - np.log(t.sell_constraints[t.round])) / C * 2 - 1 for t in traders]
+    res = (round, sum(np.abs(dw)) / 2, sum(du), np.std(mrss), np.mean(c), total_trades/config.num_traders)
     print("%4d W: %.3f U: %.3f M: %.3f C: %.3f T: %2.2f" % res)
+
+    def pretty(l):
+        return " ".join(["%.3f" % x for x in l])
 
     is_last = round == config.rounds - 1
     if is_last and config.verbose:
@@ -334,22 +326,19 @@ def do_round(config, traders, round):
         plt.subplots_adjust(hspace=.3, bottom=.05, top=.95)
         plt.show()
 
-    if config.convergence and is_last:
-        plt.figure("sum of trade sizes")
-        plt.plot(smoothed)
-        plt.show()
-
     return res
 
 def random_traders(n, config):
     return [Trader(i, random.random(), (random.random(),random.random()), config)
             for i in range(n)]
 
-def write_log(config, w, u, m, c):
+def write_log(config, elapsed, w, u, m, c):
+    
     if config.log_path:
         obj = {}
         obj["command"] = " ".join(sys.argv)
         obj["config"] = vars(config)
+        obj["elapsed"] = elapsed
         obj["wealths"] = w.tolist()
         obj["utilities"] = u.tolist()
         obj["mrs convergences"] = m.tolist()
@@ -380,6 +369,7 @@ def run(config):
     mrs_convergence = np.empty([config.rounds])
     constrainedness = np.empty([config.rounds])
         
+    start_time = time()
     for i in range(config.rounds):
         # TODO: print num trades?
         _, w, u, m, c, t = do_round(config, traders, i)
@@ -391,7 +381,12 @@ def run(config):
         for t in traders:
             t.reset()
 
-    write_log(config, wealths, utilities, mrs_convergence, constrainedness) 
+    elapsed = time() - start_time
+    print("%3.2f seconds elapsed" % elapsed)
+    global bench_time
+    print("%3.2f bench time" % bench_time)
+
+    write_log(config, elapsed, wealths, utilities, mrs_convergence, constrainedness) 
 
     if config.rounds > 1:
         # normalization to make it fit on plot with other variables
@@ -418,35 +413,42 @@ def run(config):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-n", "--num-traders", type=int, default=2)
-    parser.add_argument("-t", "--trader-file", help="file to load traders from")
     parser.add_argument("-r", "--rounds", type=int, default=1)
-    parser.add_argument("-m", "--min-size", type=float, default=0.01,
-                        help="minimum size of trade (default: 0.01)")
     parser.add_argument("-l", "--log-path", help="directory to save logs to")
-    parser.add_argument("-f", "--finish-count", type=int, default=25,
-                        help="number of empty trades to finish a round (default: 25)")
     parser.add_argument("-s", "--seed", default=str(random.randint(0, 10000)),
                         help="seed to initialize PRNG")
-    parser.add_argument("-p", "--plot", action="store_true", help="plot the allocations")
-    parser.add_argument("-P", "--plot-all", action="store_true", help="plot the allocations every round ")
-    parser.add_argument("-v", "--verbose", action="store_true", help="print individual results")
-    parser.add_argument("-b", "--buckets", type=int, default=25,
-                        help="number of buckets for convergence graph smoothing (default: 25)")
-    parser.add_argument("-c", "--convergence", action="store_true", help="plot convergence")
+
+    # Intraday args
+    parser.add_argument("-t", "--trader-file", help="file to load traders from")
+    parser.add_argument("-m", "--min-size", type=float, default=0.01,
+                        help="minimum size of trade (default: 0.01)")
     parser.add_argument("-d", "--dynamic", action="store_true", help="dynamic size (binary search)")
-    parser.add_argument("--constraint-mode", choices=["last", "mean", "fixed"], default="mean",
+    parser.add_argument("--finish-count", type=int, default=25,
+                        help="number of empty trades to finish a round (default: 25)")
+
+    # Constraint args
+    parser.add_argument("-c", "--constraint-mode", choices=["last", "mean", "fixed"], default="mean",
                         help="how new constraints are calculated. last is the last price, mean (default) is " \
                         "the mean of the last price and current constraint," \
                         "fixed is a fixed percentage of the current constraint")
     parser.add_argument("--reversion", choices=["mean", "total", "random"], default="mean",
                         help="revert bad constraints to mean (default) of old and new constraint, totally " \
                         "to the old constraint, or randomly" )
-    parser.add_argument("--constraint-factor", type=float, default=0.1,
+    parser.add_argument("-f", "--constraint-factor", type=float, default=0.1,
                         help="factor used for fixed constraining")
-    parser.add_argument("--backtracks", type=int, nargs='*', default=[],
+    parser.add_argument("-b", "--backtracks", type=int, nargs='*', default=[],
                         help="revert constraint if utility dropped since [BACKTRACK] (default: [])")
     parser.add_argument("--backtrack-prob", type=float, default=0.50,
                         help="backtrack with [PROBABILITY] if utility has fallen (default: 0.5)")
+    parser.add_argument("--backtrack-threshold", type=float, default=0.95,
+                        help="backtrack if utility has fallen below [THRESHOLD] * previous (default: 0.95)")
+
+    # Plotting args
+    parser.add_argument("-p", "--plot", action="store_true", help="plot the allocations")
+    parser.add_argument("-P", "--plot-all", action="store_true", help="plot the allocations every round ")
+    parser.add_argument("-v", "--verbose", action="store_true", help="print individual results")
+    parser.add_argument("--convergence", action="store_true", help="plot convergence")
+
     args = parser.parse_args()
     random.seed(args.seed)
     print("seed: " + args.seed)
