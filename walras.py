@@ -1,8 +1,10 @@
 import numpy as np
-from itertools import product
 import random
 import matplotlib.pyplot as plt
 import argparse
+import sys
+import os
+import json
 from enum import Enum
 
 # TODO pick good defaults here
@@ -65,6 +67,8 @@ class Trader():
         self.constraint_mode = config.constraint_mode
         self.reversion = config.reversion
         self.constraint_factor = config.constraint_factor
+        self.backtracks = config.backtracks
+        self.backtrack_prob = config.backtrack_prob
 
     def reset(self):
         self.update_constraints()
@@ -74,18 +78,19 @@ class Trader():
         self.allocs = [self.endowment]
         self.alloc = self.endowment
         
-    def backtrack(self, round, lookbacks):
-        du = self.du
-        dw = self.dw
-        next = round
-        while du[next] >= du[round] and round > 0:
-            next, round = lookbacks[next], next
-        return round
-
     def pick_constraint(self, constraints, lookbacks, dir, net_buyer):
         cur = self.round
         du = self.du
         dw = self.dw
+        # Check [backtrack] days in the past and revert if utility has fallen
+        # TODO: randomize this? use epsilon? use moving average?
+        for bt in self.backtracks:
+            if cur >= bt:
+                if du[cur] < du[cur - bt] and random.random() < self.backtrack_prob:
+                    constraints.append(constraints[cur - bt])
+                    lookbacks.append(lookbacks[cur - bt])
+                    return
+
         # Checking whether improvement was successful, and maybe reverting
         if cur > 0:
             old = lookbacks[cur]
@@ -99,12 +104,13 @@ class Trader():
                         constraints.append(constraints[old])
                         # TODO: which should we lookback to?
                         lookbacks.append(lookbacks[old])
-                    elif self.reversion == "backtrack":
-                        r = self.backtrack(old, lookbacks)
-                        constraints.append(constraints[r])
-                        # TODO: which should we lookback to? cur, old, lb[r]?
-                        lookbacks.append(lookbacks[r])
-                    #elif self.reversion == "random":
+                    # elif self.reversion == "backtrack":
+                    #     r = self.backtrack(old, lookbacks)
+                    #     constraints.append(constraints[r])
+                    #     # TODO: which should we lookback to? cur, old, lb[r]?
+                    #     lookbacks.append(lookbacks[r])
+
+                    # elif self.reversion == "random":
                     else:
                         r = random.randint(0, old)
                         constraints.append(constraints[r])
@@ -135,6 +141,7 @@ class Trader():
     def update_constraints(self):
         self.dw.append(self.d_wealth())
         self.du.append(self.d_utility())
+        # TODO: check how many buys and sells per trader
         net_buyer = self.alloc[0] > self.endowment[0]
         self.pick_constraint(self.buy_constraints, self.buy_lookbacks, Dir.buy, net_buyer)
         self.pick_constraint(self.sell_constraints, self.sell_lookbacks, Dir.sell, net_buyer)
@@ -283,15 +290,15 @@ def trade_random(traders, min_size, dynamic):
     a,b = random.sample(traders,2)
     return(a.trade(b, min_size, dynamic))
 
-def do_round(config, traders, is_last):
+def do_round(config, traders, round):
     trades = []
 
     # wait for until the last finish-count trades have been 0-size
     while (len(trades) < config.finish_count or sum(trades[-config.finish_count:]) > 0):
         trade = trade_random(traders, config.min_size, config.dynamic)
         trades.append(abs(trade.size))
-        if args.verbose and abs(trade.size) > 0:
-            print(trade)
+        # if config.verbose and abs(trade.size) > 0:
+        #     print(trade)
 
     b = config.buckets
     bsz = len(trades) // b
@@ -308,10 +315,11 @@ def do_round(config, traders, is_last):
     du = [t.d_utility() for t in traders]
     C = np.log(BUY_CONSTRAINT) - np.log(SELL_CONSTRAINT)
     c = [(np.log(t.buy_constraints[t.round]) - np.log(t.sell_constraints[t.round])) / C for t in traders]
-    res = (sum(np.abs(dw)) / 2, sum(du), np.std(mrss), np.mean(c))
-    print("W: %.3f U: %.3f M: %.3f C: %.3f" % res)
+    res = (round, sum(np.abs(dw)) / 2, sum(du), np.std(mrss), np.mean(c), len(trades)/config.num_traders)
+    print("%4d W: %.3f U: %.3f M: %.3f C: %.3f T: %2.2f" % res)
 
-    if is_last:
+    is_last = round == config.rounds - 1
+    if is_last and config.verbose:
         print("mrss:", pretty(mrss))
         print("dw:  ", pretty(dw))
         print("du:  ", pretty(du))
@@ -336,7 +344,24 @@ def do_round(config, traders, is_last):
 def random_traders(n, config):
     return [Trader(i, random.random(), (random.random(),random.random()), config)
             for i in range(n)]
-    
+
+def write_log(config, w, u, m, c):
+    if config.log_path:
+        obj = {}
+        obj["command"] = " ".join(sys.argv)
+        obj["config"] = vars(config)
+        obj["wealths"] = w.tolist()
+        obj["utilities"] = u.tolist()
+        obj["mrs convergences"] = m.tolist()
+        obj["constrainedness"] = c.tolist()
+
+        i = 0
+        while os.path.exists("%s/log%03d" % (config.log_path, i)):
+            i += 1
+        with open("%s/log%03d" % (config.log_path, i), "w") as f:
+            json.dump(obj, f)
+
+
 def run(config):
     traders = []
     if config.trader_file:
@@ -356,7 +381,8 @@ def run(config):
     constrainedness = np.empty([config.rounds])
         
     for i in range(config.rounds):
-        w, u, m, c = do_round(config, traders, i == config.rounds - 1)
+        # TODO: print num trades?
+        _, w, u, m, c, t = do_round(config, traders, i)
         wealths[i] = w
         utilities[i] = u
         mrs_convergence[i] = m
@@ -365,10 +391,14 @@ def run(config):
         for t in traders:
             t.reset()
 
+    write_log(config, wealths, utilities, mrs_convergence, constrainedness) 
+
     if config.rounds > 1:
-        utilities /= max(utilities)
-        mrs_convergence /= max(mrs_convergence)
-        constrainedness /= max(constrainedness)
+        # normalization to make it fit on plot with other variables
+        # utilities /= max(utilities)
+        utilities /= config.num_traders / 5
+
+
         plt.figure("multiround data", figsize=(10,8))
         plt.plot(wealths,         label="wealth transfers (%)")
         plt.plot(utilities,       label="utility gains")
@@ -392,13 +422,14 @@ if __name__ == "__main__":
     parser.add_argument("-r", "--rounds", type=int, default=1)
     parser.add_argument("-m", "--min-size", type=float, default=0.01,
                         help="minimum size of trade (default: 0.01)")
+    parser.add_argument("-l", "--log-path", help="directory to save logs to")
     parser.add_argument("-f", "--finish-count", type=int, default=25,
                         help="number of empty trades to finish a round (default: 25)")
     parser.add_argument("-s", "--seed", default=str(random.randint(0, 10000)),
                         help="seed to initialize PRNG")
     parser.add_argument("-p", "--plot", action="store_true", help="plot the allocations")
     parser.add_argument("-P", "--plot-all", action="store_true", help="plot the allocations every round ")
-    parser.add_argument("-v", "--verbose", action="store_true", help="print each trade")
+    parser.add_argument("-v", "--verbose", action="store_true", help="print individual results")
     parser.add_argument("-b", "--buckets", type=int, default=25,
                         help="number of buckets for convergence graph smoothing (default: 25)")
     parser.add_argument("-c", "--convergence", action="store_true", help="plot convergence")
@@ -407,16 +438,16 @@ if __name__ == "__main__":
                         help="how new constraints are calculated. last is the last price, mean (default) is " \
                         "the mean of the last price and current constraint," \
                         "fixed is a fixed percentage of the current constraint")
-    parser.add_argument("--reversion", choices=["mean", "total", "backtrack", "random"], default="mean",
+    parser.add_argument("--reversion", choices=["mean", "total", "random"], default="mean",
                         help="revert bad constraints to mean (default) of old and new constraint, totally " \
                         "to the old constraint, or randomly" )
     parser.add_argument("--constraint-factor", type=float, default=0.1,
                         help="factor used for fixed constraining")
+    parser.add_argument("--backtracks", type=int, nargs='*', default=[],
+                        help="revert constraint if utility dropped since [BACKTRACK] (default: [])")
+    parser.add_argument("--backtrack-prob", type=float, default=0.50,
+                        help="backtrack with [PROBABILITY] if utility has fallen (default: 0.5)")
     args = parser.parse_args()
     random.seed(args.seed)
     print("seed: " + args.seed)
-    args
     run(args)
-
-
-
