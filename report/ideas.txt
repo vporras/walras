@@ -1,0 +1,188 @@
+todo
+====
+  set up testing harness
+    summary stats
+  pick list of interesting experiments
+  read other papers
+  create centrally planned system for comparison
+
+  choice of finish count?
+    seems like high finish count can avoid the need for backtracking
+    very important for dumb trades
+
+  private mrss or public last traded mrss?
+    could use public for stopping condition
+    at least as good as stopping for zero trades
+    should use private last trade for constraint calculation
+
+  measure utility gains
+    per trader?
+    as percent gains?
+
+  use VWAP instead of last price to calculate
+    wealth?
+    constraints?
+
+  average stats over a few rounds to reduce noice?
+    might be important when measuring variance across seeds
+
+
+summary statistics 
+==================
+  % that converged
+  % that diverged
+  at [convergence/end]
+    wealth
+    Dwealth
+    D%wealth
+    time (time/round)
+    Dutility
+    mrs closeness
+    constrainedness
+    
+    should these be averaged over Z rounds?
+
+  distance from centralised deterministic system
+    utility? (might be lower in central!)
+    mrs distance
+
+  use Stats when printing daily data
+
+time metrics
+============
+  wall clock
+  days
+  pairs (all trades)
+  non-zero trades
+  calls to oracles (sensitive to dynamic sizing)
+
+convergence criteria
+====================
+  moving averages of [wealths/utilities] are equal within tolerance
+  below threshold X of
+    wealths
+    Dwealth since start
+  
+  
+divergence criteria
+===================
+  diff of moving averages of utilities is negative outside tolerance
+  moving avg of mrs is high
+
+
+motivation
+==========
+  tatonnement is like centrally planned economy
+  restrictions on pricing or utility functions
+
+
+information we have access to
+=============================
+  whether traders will accept a trade or not
+  their MRS at a given point
+    is this realistic?
+    needs differentiability
+  without differentiability
+    can used stochastic utility functions
+    
+
+what happens in an individual day
+=================================
+  loop:
+    pick 2 traders
+    figure which dir they want to trade (needs diff)
+    calculate joint mrs / price to trade at
+      this could be done with individual mrs or with constraints
+    choose size
+      fixed: medium size
+      dynamic: largest plus-u size
+
+    change allocations if plus-u
+
+  stopping conditions
+    wait until x empty trades
+    could use variation in public last mrs
+    could have fixed numbers
+    wait until X% of recent trades are empty
+
+across rounds
+=============
+  tighten constraints if
+    lost wealth (privately estimated)
+
+  each metric used
+    wealths (publicly calculated from truth)
+    utilities
+    mrs convergences
+    constrainedness
+      theoretical maximum
+
+  stopping conditions
+    access to global information?
+
+  death spirals
+    what characterizes death spiral
+      mrsc goes way up
+      utility goes down
+    why do they occur?
+      trading stops as rounds fail to converge 
+    how to fight them
+      backtracking
+
+parameters
+==========
+  traders/rounds
+    single day
+    multiple days
+  seeds
+    stability across seeds
+  sizing (min/dynamic)
+    effect on time/convergence
+  finish count
+
+  constraints
+    metrics
+      speed
+      death spirals
+    
+    modes (new constraints)
+      fixed
+        constraint factor
+      last
+        suggested by paper
+      mean
+
+    reversion
+      mean
+      total
+      random
+
+    backtracks
+      needed to capture longer term problems
+      many variables being optimized at once, so will step on each others' toes sometimes
+
+      selection of backtrack points
+      probability
+      threshold
+
+comparison to centralised algorithms
+====================================
+  tatonnement
+  fancier, more efficient ones
+  divisible goods
+
+figures
+=======
+  price/volume for 1 trader over a couple days
+    area over curve is wealth lost
+    show constraint
+  1 day among 2, 3, 4 traders
+  across time for 100 traders
+  bar charts comparing experiments
+  
+
+
+
+
+
+

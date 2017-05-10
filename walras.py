@@ -5,6 +5,7 @@ import argparse
 import sys
 import os
 import json
+import multiprocessing as mp
 from time import time
 from enum import Enum
 
@@ -13,21 +14,6 @@ BUY_CONSTRAINT = 10
 SELL_CONSTRAINT = 0.1
 
 bench_time = 0
-
-class Trade():
-    
-    def __init__(self, source, origin, size, joint_mrs):
-        self.source = source
-        self.origin = origin
-        self.size = size
-        self.joint_mrs = joint_mrs
-
-    def __str__(self):
-        return ("From {src},\n To {origin},\n with size {size},\n at {mrs}".format(
-            src = self.source,
-            origin = self.origin,
-            size = self.size,
-            mrs = self.joint_mrs))
 
 class Dir(Enum):
     """Direction of trade in terms of good 1"""
@@ -87,7 +73,7 @@ class Trader():
         du = self.du
         dw = self.dw
         th = self.backtrack_threshold 
-        # Check [backtrack] days in the past and revert if utility has fallen
+        # Check [backtrack] rounds in the past and revert if utility has fallen
         for bt in self.backtracks:
             if cur >= bt:
                 if du[cur] < du[cur - bt] * th and random.random() < self.backtrack_prob:
@@ -244,6 +230,22 @@ class Trader():
             other.last_trade_mrs = joint_mrs
             
         return size
+
+    # No access to derivative, so can't guess direction
+    def dumb_trade(self, other, min_size, dynamic):
+        dir = Dir.buy
+        # Pick a random price
+        # TODO: truncated normal?
+        joint_mrs = random.uniform(other.sell_constraints[self.round], self.buy_constraints[self.round])
+        size = self.get_size(other, Dir.buy, joint_mrs, min_size, dynamic)
+
+        if size != 0:
+            self.change_alloc(self.new_alloc(size, joint_mrs))
+            other.change_alloc(other.new_alloc(-size, joint_mrs))
+            self.last_trade_mrs = joint_mrs
+            other.last_trade_mrs = joint_mrs
+            
+        return size
         
     def plot(self, rows, index):
         alpha = self.preference
@@ -281,16 +283,19 @@ class Trader():
             preference = self.preference,
             alloc = self.alloc))
 
-def trade_random(traders, min_size, dynamic):
+def trade_random(traders, min_size, dynamic, utility_only):
     a,b = random.sample(traders,2)
-    return(a.trade(b, min_size, dynamic))
+    if utility_only:
+        return(a.dumb_trade(b, min_size, dynamic))
+    else:
+        return(a.trade(b, min_size, dynamic))
 
 def do_round(config, traders, round):
     # wait for until the last [finish_count] trades have been 0-size
     consecutive_zero_trades = 0
     total_trades = 0
     while consecutive_zero_trades < config.finish_count:
-        size = trade_random(traders, config.min_size, config.dynamic)
+        size = trade_random(traders, config.min_size, config.dynamic, config.utility_only)
         total_trades += 1
         if size == 0:
             consecutive_zero_trades += 1
@@ -299,24 +304,29 @@ def do_round(config, traders, round):
 
     total_wealth = sum([t.wealth(t.alloc) for t in traders])
 
-    mrss = [t.mrs(Dir.buy) for t in traders]
+    # mrss = [t.mrs(Dir.buy) for t in traders]
+    mrss_raw = np.array([t.last_trade_mrs for t in traders])
+    # filter out the ones without a last trade
+    mrss = mrss_raw[mrss_raw != np.array(None)]
     dw = [t.d_wealth() / total_wealth for t in traders]
     du = [t.d_utility() for t in traders]
     C = np.log(BUY_CONSTRAINT) - np.log(SELL_CONSTRAINT)
     c = [(np.log(t.buy_constraints[t.round]) - np.log(t.sell_constraints[t.round])) / C * 2 - 1 for t in traders]
+    # TODO: should this include empty trades?
     res = (round, sum(np.abs(dw)) / 2, sum(du), np.std(mrss), np.mean(c), total_trades/config.num_traders)
-    print("%4d W: %.3f U: %.3f M: %.3f C: %.3f T: %2.2f" % res)
-
-    def pretty(l):
-        return " ".join(["%.3f" % x for x in l])
+    if config.verbosity >= 3:
+        print("%4d W: %.3f U: %.3f M: %.3f C: %.3f T: %2.2f" % res)
 
     is_last = round == config.rounds - 1
-    if is_last and config.verbose:
-        print("mrss:", pretty(mrss))
+    if  config.verbosity == 4 and is_last:
+        def pretty(l):
+            return " ".join(["%.3f" % x for x in l])
+
+        print("mrss:", pretty(mrss_raw))
         print("dw:  ", pretty(dw))
         print("du:  ", pretty(du))
 
-    if config.plot and is_last or config.plot_all:
+    if config.plotting >= 2 and is_last or config.plotting >= 3:
         plt.figure("allocations over time", figsize=(10, 12))
 
         # only plot first 4 traders due to screen size
@@ -341,7 +351,7 @@ def write_log(config, elapsed, w, u, m, c):
         obj["elapsed"] = elapsed
         obj["wealths"] = w.tolist()
         obj["utilities"] = u.tolist()
-        obj["mrs convergences"] = m.tolist()
+        obj["mrs closeness"] = m.tolist()
         obj["constrainedness"] = c.tolist()
 
         i = 0
@@ -351,7 +361,57 @@ def write_log(config, elapsed, w, u, m, c):
             json.dump(obj, f)
 
 
-def run(config):
+class TrialSummary():
+    """Summary statistics for a trial"""
+
+    class Stats():
+        """Stats for summaries"""
+        def __init__(self, seconds, wealth, utility, mrs_closeness, constrainedness):
+            self.seconds         = seconds
+            self.wealth          = wealth
+            self.utility         = utility
+            self.mrs_closeness   = mrs_closeness
+            self.constrainedness = constrainedness
+
+        @classmethod
+        def from_idx(cls, idx, seconds, wealth, utility, mrs_closeness, constrainedness):
+            return cls(seconds[idx], wealth[idx], utility[idx], mrs_closeness[idx], constrainedness[idx])
+
+        def __add__(self, other):
+            if other is None or other is 0:
+                return self
+            seconds         = self.seconds          + other.seconds                   
+            wealth          = self.wealth           + other.wealth
+            utility         = self.utility          + other.utility
+            mrs_closeness   = self.mrs_closeness    + other.mrs_closeness
+            constrainedness = self.constrainedness  + other.constrainedness
+            return self.__init__(seconds, wealth, utility, mrs_closeness, constrainedness)
+
+        def __radd__(self, other):
+            return self + other
+
+        def __truediv__(self, other):
+            seconds         = self.seconds          / other           
+            wealth          = self.wealth           / other           
+            utility         = self.utility          / other           
+            mrs_closeness   = self.mrs_closeness    / other           
+            constrainedness = self.constrainedness  / other           
+            return self.__init__(seconds, wealth, utility, mrs_closeness, constrainedness)
+
+        def __str__(self):
+            return ("W: %.3f U: %.3f M: %.3f C: %.3f S: %2.2f"
+                    % (self.wealth, self.utility, self.mrs_closeness, self.constrainedness, self.seconds))
+
+    def __init__(self, config, seconds, wealth, utility, mrs_closeness, constrainedness):
+        self.seed = config.seed
+        self.end  = self.Stats.from_idx(config.rounds - 1, seconds, wealth, utility, mrs_closeness, constrainedness)
+
+    def __str__(self):
+        return "seed: %d\nend: %s" % (self.seed, str(self.end))
+
+def do_trial(config, results):
+    random.seed(config.seed)
+
     traders = []
     if config.trader_file:
         with open(config.trader_file) as file:
@@ -366,29 +426,38 @@ def run(config):
 
     wealths         = np.empty([config.rounds])
     utilities       = np.empty([config.rounds])
-    mrs_convergence = np.empty([config.rounds])
+    mrs_closeness   = np.empty([config.rounds])
     constrainedness = np.empty([config.rounds])
+    seconds         = np.empty([config.rounds])
         
     start_time = time()
     for i in range(config.rounds):
-        # TODO: print num trades?
         _, w, u, m, c, t = do_round(config, traders, i)
         wealths[i] = w
         utilities[i] = u
-        mrs_convergence[i] = m
+        mrs_closeness[i] = m
         constrainedness[i] = c
+        seconds[i] = time() - start_time
     
         for t in traders:
             t.reset()
 
     elapsed = time() - start_time
-    print("%3.2f seconds elapsed" % elapsed)
     global bench_time
-    print("%3.2f bench time" % bench_time)
 
-    write_log(config, elapsed, wealths, utilities, mrs_convergence, constrainedness) 
+    #if config.verbosity >= 2:
+        # print("%3.2f seconds elapsed" % elapsed)
+        # print("%3.2f bench time" % bench_time)
 
-    if config.rounds > 1:
+    write_log(config, elapsed, wealths, utilities, mrs_closeness, constrainedness) 
+
+    summary = TrialSummary(config, seconds, wealths, utilities, mrs_closeness, constrainedness)
+    if config.verbosity >= 2:
+        print(summary)
+
+    results.put(summary)
+
+    if config.plotting >= 1 and config.rounds > 1:
         # normalization to make it fit on plot with other variables
         # utilities /= max(utilities)
         utilities /= config.num_traders / 5
@@ -397,7 +466,7 @@ def run(config):
         plt.figure("multiround data", figsize=(10,8))
         plt.plot(wealths,         label="wealth transfers (%)")
         plt.plot(utilities,       label="utility gains")
-        plt.plot(mrs_convergence, label="mrs convergence (stddev)")
+        plt.plot(mrs_closeness,   label="mrs closeness (stddev)")
         plt.plot(constrainedness, label="constrainedness %")
 
     
@@ -409,27 +478,61 @@ def run(config):
 
         plt.show()
 
+def run(config):
+    results = mp.Queue()
+    for i in range(0, config.trials):
+        p = mp.Process(target=do_trial, args=(config, results))
+        p.start()
+        config.seed += 1
+
+    data = []
+    for i in range(0, config.trials):
+        data.append(results.get())
+
+    x = 0
+    for d in data:
+        x = x + d.end
+        print(d.end)
+        print(x)
+
+    combined = sum([d.end for d in data]) # / config.rounds
+
+    i = 0
+    while os.path.exists("results/%d_%d" % (config.experiment, i)):
+        i += 1
+    with open("results/%d_%d" % (config.experiment, i), "w") as f:
+        print(combined, file=f)
+        if config.verbosity >= 1:
+            print(combined)
+
+
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-n", "--num-traders", type=int, default=2)
     parser.add_argument("-r", "--rounds", type=int, default=1)
     parser.add_argument("-l", "--log-path", help="directory to save logs to")
-    parser.add_argument("-s", "--seed", default=str(random.randint(0, 10000)),
-                        help="seed to initialize PRNG")
+    parser.add_argument("-s", "--seed", type=int, default=random.randint(0, 10000),
+                        help="integer seed to initialize PRNG")
+    parser.add_argument("-t", "--trials", type=int, default=1,
+                        help="number of trials to test on, incrementing seed by 1 each time")
+    parser.add_argument("-e", "--experiment", type=int, default=0,
+                        help="id of experiment being run")
 
     # Intraday args
-    parser.add_argument("-t", "--trader-file", help="file to load traders from")
+    parser.add_argument("--trader-file", help="file to load traders from")
     parser.add_argument("-m", "--min-size", type=float, default=0.01,
                         help="minimum size of trade (default: 0.01)")
     parser.add_argument("-d", "--dynamic", action="store_true", help="dynamic size (binary search)")
     parser.add_argument("--finish-count", type=int, default=25,
                         help="number of empty trades to finish a round (default: 25)")
+    parser.add_argument("-u", "--utility-only", action="store_true", help="don't use derivatives of utility function")
 
     # Constraint args
     parser.add_argument("-c", "--constraint-mode", choices=["last", "mean", "fixed"], default="mean",
                         help="how new constraints are calculated. last is the last price, mean (default) is " \
-                        "the mean of the last price and current constraint," \
+                        "the mean of the last price and current constraint, " \
                         "fixed is a fixed percentage of the current constraint")
     parser.add_argument("--reversion", choices=["mean", "total", "random"], default="mean",
                         help="revert bad constraints to mean (default) of old and new constraint, totally " \
@@ -444,12 +547,11 @@ if __name__ == "__main__":
                         help="backtrack if utility has fallen below [THRESHOLD] * previous (default: 0.95)")
 
     # Plotting args
-    parser.add_argument("-p", "--plot", action="store_true", help="plot the allocations")
-    parser.add_argument("-P", "--plot-all", action="store_true", help="plot the allocations every round ")
-    parser.add_argument("-v", "--verbose", action="store_true", help="print individual results")
-    parser.add_argument("--convergence", action="store_true", help="plot convergence")
+    parser.add_argument("-p", "--plotting", type=int, default=1,
+                        help="plotting level: 0 is none, 1 is summary chart, 2 is last round, 3 is every round")
+    parser.add_argument("-v", "--verbosity", type=int, default=3,
+                        help="verbosity level: 0 is nothing, 1 includes summary of all trials, 2 includes " \
+                        "summary of each trial, 3 includes data after each round, 4 includes data from each trader")
 
     args = parser.parse_args()
-    random.seed(args.seed)
-    print("seed: " + args.seed)
     run(args)
