@@ -8,6 +8,7 @@ import json
 import multiprocessing as mp
 from time import time
 from enum import Enum
+from operator import itemgetter
 
 # TODO pick good defaults here
 BUY_CONSTRAINT = 10
@@ -320,9 +321,9 @@ def do_round(config, traders, round):
     is_last = round == config.rounds - 1
     if  config.verbosity == 4 and is_last:
         def pretty(l):
-            return " ".join(["%.3f" % x for x in l])
-
-        print("mrss:", pretty(mrss_raw))
+            return " ".join(["%.3f" % x for x in l if not x is None])
+        
+        print("mrss:", pretty(mrss))
         print("dw:  ", pretty(dw))
         print("du:  ", pretty(du))
 
@@ -364,50 +365,83 @@ def write_log(config, elapsed, w, u, m, c):
 class TrialSummary():
     """Summary statistics for a trial"""
 
-    class Stats():
+    class Stats(tuple):
         """Stats for summaries"""
-        def __init__(self, seconds, wealth, utility, mrs_closeness, constrainedness):
-            self.seconds         = seconds
-            self.wealth          = wealth
-            self.utility         = utility
-            self.mrs_closeness   = mrs_closeness
-            self.constrainedness = constrainedness
+        __slots__ = []
+        def __new__(cls, w, u, m, c, s):
+            return tuple.__new__(cls, (w, u, m, c, s))
+
+        def __getnewargs__(self):
+            return (self.wealth, self.utility, self.mrs_closeness, self.constrainedness, self.seconds)
+
+        wealth          = property(itemgetter(0))
+        utility         = property(itemgetter(1))
+        mrs_closeness   = property(itemgetter(2))
+        constrainedness = property(itemgetter(3))
+        seconds         = property(itemgetter(4))
+
+
+        # def __new__(cls, seconds, wealth, utility, mrs_closeness, constrainedness):
 
         @classmethod
-        def from_idx(cls, idx, seconds, wealth, utility, mrs_closeness, constrainedness):
-            return cls(seconds[idx], wealth[idx], utility[idx], mrs_closeness[idx], constrainedness[idx])
+        def from_idx(cls, idx, wealth, utility, mrs_closeness, constrainedness, seconds):
+            return cls(wealth[idx], utility[idx], mrs_closeness[idx], constrainedness[idx], seconds[idx])
 
         def __add__(self, other):
             if other is None or other is 0:
                 return self
-            seconds         = self.seconds          + other.seconds                   
-            wealth          = self.wealth           + other.wealth
-            utility         = self.utility          + other.utility
-            mrs_closeness   = self.mrs_closeness    + other.mrs_closeness
-            constrainedness = self.constrainedness  + other.constrainedness
-            return self.__init__(seconds, wealth, utility, mrs_closeness, constrainedness)
+            return TrialSummary.Stats(*[x + y for (x, y) in zip(self, other)])
 
         def __radd__(self, other):
             return self + other
 
         def __truediv__(self, other):
-            seconds         = self.seconds          / other           
-            wealth          = self.wealth           / other           
-            utility         = self.utility          / other           
-            mrs_closeness   = self.mrs_closeness    / other           
-            constrainedness = self.constrainedness  / other           
-            return self.__init__(seconds, wealth, utility, mrs_closeness, constrainedness)
+            return TrialSummary.Stats(*[x / other for x in self])
 
         def __str__(self):
             return ("W: %.3f U: %.3f M: %.3f C: %.3f S: %2.2f"
                     % (self.wealth, self.utility, self.mrs_closeness, self.constrainedness, self.seconds))
 
-    def __init__(self, config, seconds, wealth, utility, mrs_closeness, constrainedness):
+    def find_conv(self, config, w):
+        bsz = config.bucket_size
+        trailing = sum(w[0   : bsz])   / bsz
+        leading  = sum(w[bsz : bsz*2]) / bsz
+        var   = np.var(w[0   : bsz*2])
+        conv_idx = -1
+        for i in range(bsz, config.rounds - bsz): #TODO possibly +1 at end?
+
+            var2 = np.var(w[i - bsz : i + bsz])
+            print("%d %0.5f %0.5f %0.5f" % (i, abs(trailing - leading), var, var2))
+            if abs(trailing - leading) < config.conv_threshold:
+                conv_idx = i
+                break
+            dvar = w[i - bsz] - (trailing + leading)/2
+            print((trailing + leading)/2)
+            trailing += (w[i]       - w[i - bsz]) / bsz
+            leading  += (w[i + bsz] - w[i]      ) / bsz
+            print((trailing + leading)/2)
+            var += (w[i + bsz] - w[i - bsz]) * (w[i + bsz] - (trailing + leading)/2 + dvar) / (bsz - 1)
+            
+        return conv_idx
+
+    def __init__(self, config, wealth, utility, mrs_closeness, constrainedness, seconds):
         self.seed = config.seed
-        self.end  = self.Stats.from_idx(config.rounds - 1, seconds, wealth, utility, mrs_closeness, constrainedness)
+        self.end  = self.Stats.from_idx(config.rounds - 1, wealth, utility, mrs_closeness, constrainedness, seconds)
+        self.div_idx = -1
+        self.did_div = self.div_idx >= 0
+        self.conv_idx = self.find_conv(config, wealth)
+        self.did_conv = self.conv_idx >= 0 and not self.did_div or self.conv_idx < self.div_idx
+        if self.did_conv:
+            self.conv = self.Stats.from_idx(self.conv_idx, wealth, utility, mrs_closeness, constrainedness, seconds)
+            
 
     def __str__(self):
-        return "seed: %d\nend: %s" % (self.seed, str(self.end))
+        res = "seed: %d" % self.seed 
+        res += "\nend: %s" % str(self.end)
+        if self.did_conv:
+            res += "\nconv idx: %d" % self.conv_idx
+            res += "\nconv: %s" % str(self.conv)
+        return res
 
 def do_trial(config, results):
     random.seed(config.seed)
@@ -451,7 +485,7 @@ def do_trial(config, results):
 
     write_log(config, elapsed, wealths, utilities, mrs_closeness, constrainedness) 
 
-    summary = TrialSummary(config, seconds, wealths, utilities, mrs_closeness, constrainedness)
+    summary = TrialSummary(config, wealths, utilities, mrs_closeness, constrainedness, seconds)
     if config.verbosity >= 2:
         print(summary)
 
@@ -489,13 +523,9 @@ def run(config):
     for i in range(0, config.trials):
         data.append(results.get())
 
-    x = 0
-    for d in data:
-        x = x + d.end
-        print(d.end)
-        print(x)
-
-    combined = sum([d.end for d in data]) # / config.rounds
+    avg_end = sum([d.end for d in data]) / config.trials
+    pct_conv = len([d for d in data if d.did_conv]) / config.trials * 100
+    combined = "converged: %3.f%%\nend: %s" % (pct_conv, str(avg_end))
 
     i = 0
     while os.path.exists("results/%d_%d" % (config.experiment, i)):
@@ -545,6 +575,12 @@ if __name__ == "__main__":
                         help="backtrack with [PROBABILITY] if utility has fallen (default: 0.5)")
     parser.add_argument("--backtrack-threshold", type=float, default=0.95,
                         help="backtrack if utility has fallen below [THRESHOLD] * previous (default: 0.95)")
+
+    # Summary args
+    parser.add_argument("--bucket-size", type=int, default=5,
+                        help="number of rounds to average when calculating convergence and divergence (default: 5)")
+    parser.add_argument("--conv-threshold", type=float, default=0.005,
+                        help="register convergence if moving average wealths are within [THRESHOLD] (default: 0.005)")
 
     # Plotting args
     parser.add_argument("-p", "--plotting", type=int, default=1,
