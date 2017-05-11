@@ -40,7 +40,6 @@ class Trader():
         self.endowment = endowment
         self.allocs = [endowment]
         self.alloc = endowment
-        self.last_trade_mrs = None
         self.round = 0
 
         # these lists store histories of constraints by round
@@ -51,6 +50,7 @@ class Trader():
         # these store the round with which the current constraint is compared
         self.buy_lookbacks = [0]
         self.sell_lookbacks = [0]
+        self.last_trade_mrs = None
 
         self.constraint_mode = config.constraint_mode
         self.reversion = config.reversion
@@ -59,11 +59,15 @@ class Trader():
         self.backtrack_prob = config.backtrack_prob
         self.backtrack_threshold = config.backtrack_threshold
 
+    
+    last_trade_mrs = None
+
     def reset(self):
         self.update_constraints()
 
         self.round = self.round + 1
         self.last_trade_mrs = None
+        Trader.last_trade_mrs = None
         self.allocs = [self.endowment]
         self.alloc = self.endowment
         
@@ -119,7 +123,7 @@ class Trader():
             constraints.append(constraints[cur])
 
     def update_constraints(self):
-        self.dw.append(self.d_wealth())
+        self.dw.append(self.d_wealth(self.last_trade_mrs))
         self.du.append(self.d_utility())
         # TODO: check how many buys and sells per trader
         net_buyer = self.alloc[0] > self.endowment[0]
@@ -136,18 +140,18 @@ class Trader():
     def d_utility(self):
         return self.utility(self.alloc) - self.utility(self.endowment)
 
-    def wealth(self, alloc):
+    def wealth(self, alloc, mrs):
         x1, x2 = alloc
-        if self.last_trade_mrs != None:
-            return x1 + x2 * self.last_trade_mrs
+        if mrs != None:
+            return x1 + x2 * mrs
         else:
             # TODO: is this the right fallback?
             return x1 + x2
-        
+       
     # returns the total change in wealth this round, in terms of x1
-    def d_wealth(self):
-        if self.last_trade_mrs != None:
-            return self.wealth(self.alloc) - self.wealth(self.endowment)
+    def d_wealth(self, mrs):
+        if mrs != None:
+            return self.wealth(self.alloc, mrs) - self.wealth(self.endowment, mrs)
         else:
             return 0
 
@@ -222,6 +226,7 @@ class Trader():
         if size != 0:
             self.change_alloc(self.new_alloc(size, joint_mrs))
             other.change_alloc(other.new_alloc(-size, joint_mrs))
+            Trader.last_trade_mrs = joint_mrs
             self.last_trade_mrs = joint_mrs
             other.last_trade_mrs = joint_mrs
             
@@ -238,6 +243,7 @@ class Trader():
         if size != 0:
             self.change_alloc(self.new_alloc(size, joint_mrs))
             other.change_alloc(other.new_alloc(-size, joint_mrs))
+            Trader.last_trade_mrs = joint_mrs
             self.last_trade_mrs = joint_mrs
             other.last_trade_mrs = joint_mrs
             
@@ -300,13 +306,13 @@ def do_round(config, traders, round):
         else:
             consecutive_zero_trades = 0
 
-    total_wealth = sum([t.wealth(t.alloc) for t in traders])
+    total_wealth = sum([t.wealth(t.alloc, Trader.last_trade_mrs) for t in traders])
 
     # mrss = [t.mrs(Dir.buy) for t in traders]
     mrss_raw = np.array([t.last_trade_mrs for t in traders])
     # filter out the ones without a last trade
     mrss = mrss_raw[mrss_raw != np.array(None)]
-    dw = [t.d_wealth() / total_wealth for t in traders]
+    dw = [t.d_wealth(Trader.last_trade_mrs) / total_wealth for t in traders]
     starting_u = np.average([t.utility(t.endowment) for t in traders])
     du = [t.d_utility() for t in traders] / starting_u
     C = np.log(BUY_CONSTRAINT) - np.log(SELL_CONSTRAINT)
@@ -341,48 +347,28 @@ def random_traders(n, config):
     return [Trader(i, random.random(), (random.random(),random.random()), config)
             for i in range(n)]
 
-def write_log(config, w, u, m, c):
-    
-    if config.log_path:
-        obj = {}
-        obj["command"] = " ".join(sys.argv)
-        obj["config"] = vars(config)
-        obj["wealths"] = w.tolist()
-        obj["utilities"] = u.tolist()
-        obj["mrs spread"] = m.tolist()
-        obj["constrainedness"] = c.tolist()
-
-        i = 0
-        while os.path.exists("%s/log%03d" % (config.log_path, i)):
-            i += 1
-        with open("%s/log%03d" % (config.log_path, i), "w") as f:
-            json.dump(obj, f)
-
-
 class TrialSummary():
     """Summary statistics for a trial"""
 
     class Stats(tuple):
         """Stats for summaries"""
         __slots__ = []
-        def __new__(cls, w, u, m, c, s):
-            return tuple.__new__(cls, (w, u, m, c, s))
+        def __new__(cls, w, u, m, c, s, t):
+            return tuple.__new__(cls, (w, u, m, c, s, t))
 
         def __getnewargs__(self):
-            return (self.wealth, self.utility, self.mrs_spread, self.constrainedness, self.seconds)
+            return (self.wealth, self.utility, self.mrs_spread, self.constrainedness, self.seconds, self.trades)
 
         wealth          = property(itemgetter(0))
         utility         = property(itemgetter(1))
-        mrs_spread   = property(itemgetter(2))
+        mrs_spread      = property(itemgetter(2))
         constrainedness = property(itemgetter(3))
         seconds         = property(itemgetter(4))
-
-
-        # def __new__(cls, seconds, wealth, utility, mrs_spread, constrainedness):
+        trades          = property(itemgetter(5))
 
         @classmethod
-        def from_idx(cls, idx, wealth, utility, mrs_spread, constrainedness, seconds):
-            return cls(wealth[idx], utility[idx], mrs_spread[idx], constrainedness[idx], seconds[idx])
+        def from_idx(cls, idx, wealth, utility, mrs_spread, constrainedness, seconds, trades):
+            return cls(wealth[idx], utility[idx], mrs_spread[idx], constrainedness[idx], seconds[idx], trades[idx])
 
         def __add__(self, other):
             if other is None or other is 0:
@@ -396,8 +382,8 @@ class TrialSummary():
             return TrialSummary.Stats(*[x / other for x in self])
 
         def __str__(self):
-            return ("W: %.3f U: %.3f M: %.3f C: %.3f S: %2.2f"
-                    % (self.wealth, self.utility, self.mrs_spread, self.constrainedness, self.seconds))
+            return ("W: %.3f U: %.3f M: %.3f C: %.3f S: %2.2f T: %3.2f"
+                    % (self.wealth, self.utility, self.mrs_spread, self.constrainedness, self.seconds, self.trades))
 
     def find_div(self, config, u, m):
         bsz = config.bucket_size
@@ -429,15 +415,15 @@ class TrialSummary():
             
         return conv_idx
 
-    def __init__(self, config, wealth, utility, mrs_spread, constrainedness, seconds):
+    def __init__(self, config, wealth, utility, mrs_spread, constrainedness, seconds, trades):
         self.seed = config.seed
-        self.end  = self.Stats.from_idx(config.rounds - 1, wealth, utility, mrs_spread, constrainedness, seconds)
+        self.end  = self.Stats.from_idx(config.rounds - 1, wealth, utility, mrs_spread, constrainedness, seconds, trades)
         self.div_idx = self.find_div(config, utility, mrs_spread)
         self.did_div = self.div_idx >= 0
         self.conv_idx = self.find_conv(config, wealth)
         self.did_conv = self.conv_idx >= 0 and not self.did_div or self.conv_idx < self.div_idx
         if self.did_conv:
-            self.conv = self.Stats.from_idx(self.conv_idx, wealth, utility, mrs_spread, constrainedness, seconds)
+            self.conv = self.Stats.from_idx(self.conv_idx, wealth, utility, mrs_spread, constrainedness, seconds, trades)
             
 
     def __str__(self):
@@ -467,9 +453,11 @@ def do_trial(config, results):
 
     wealths         = np.empty([config.rounds])
     utilities       = np.empty([config.rounds])
-    mrs_spread   = np.empty([config.rounds])
+    mrs_spread      = np.empty([config.rounds])
     constrainedness = np.empty([config.rounds])
     seconds         = np.empty([config.rounds])
+    trades          = np.empty([config.rounds])
+    trades_accum = 0
         
     start_time = time()
     for i in range(config.rounds):
@@ -479,13 +467,13 @@ def do_trial(config, results):
         mrs_spread[i] = m
         constrainedness[i] = c
         seconds[i] = time() - start_time
+        trades_accum += t
+        trades[i] = trades_accum
     
         for t in traders:
             t.reset()
 
-    write_log(config, wealths, utilities, mrs_spread, constrainedness) 
-
-    summary = TrialSummary(config, wealths, utilities, mrs_spread, constrainedness, seconds)
+    summary = TrialSummary(config, wealths, utilities, mrs_spread, constrainedness, seconds, trades)
     if config.verbosity >= 2:
         print()
         print(summary)
@@ -555,7 +543,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-n", "--num-traders", type=int, default=2)
     parser.add_argument("-r", "--rounds", type=int, default=1)
-    parser.add_argument("-l", "--log-path", help="directory to save logs to")
     parser.add_argument("-s", "--seed", type=int, default=random.randint(0, 10000),
                         help="integer seed to initialize PRNG")
     parser.add_argument("-t", "--trials", type=int, default=1,

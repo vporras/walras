@@ -4,14 +4,7 @@ todo
     focus on death spirals and robustness to randomness
   read other papers
 
-
-  use public last price for marking wealth
-
-  time metrics
-    wall clock
-    pairs (all trades)
-      seem more natural to Paul
-    calls to oracles (sensitive to dynamic sizing)
+  should convergence before divergence count?
 
 
 summary statistics 
@@ -38,10 +31,12 @@ summary statistics
 time metrics
 ============
   wall clock
-  rounds
+    not system independent
   pairs (all trades)
+    seem more natural to Paul
   non-zero trades
   calls to oracles (sensitive to dynamic sizing)
+     maybe use later
 
 convergence criteria
 ====================
