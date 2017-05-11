@@ -1,3 +1,6 @@
+#!/bin/bash
+
+# constraints, mean reversion
 echo cons_fixed05_mean
 python3 walras.py -r 500 -n 100 -m 0.0001 -d -s 0 -v 1 -p 0 -t 100 --reversion mean -c fixed -f 0.05 -e cons_fixed05_mean
 echo cons_fixed10_mean
@@ -9,7 +12,7 @@ python3 walras.py -r 500 -n 100 -m 0.0001 -d -s 0 -v 1 -p 0 -t 100 --reversion m
 echo cons_last_mean
 python3 walras.py -r 500 -n 100 -m 0.0001 -d -s 0 -v 1 -p 0 -t 100 --reversion mean -c last -e cons_last_mean
 
-
+# constraints, total reversion
 echo cons_fixed05_total
 python3 walras.py -r 500 -n 100 -m 0.0001 -d -s 0 -v 1 -p 0 -t 100 --reversion total -c fixed -f 0.05 -e cons_fixed05_total
 echo cons_fixed10_total
@@ -21,7 +24,7 @@ python3 walras.py -r 500 -n 100 -m 0.0001 -d -s 0 -v 1 -p 0 -t 100 --reversion t
 echo cons_last_total
 python3 walras.py -r 500 -n 100 -m 0.0001 -d -s 0 -v 1 -p 0 -t 100 --reversion total -c last -e cons_last_total
 
-
+# constraints, random reversion
 echo cons_fixed05_random
 python3 walras.py -r 500 -n 100 -m 0.0001 -d -s 0 -v 1 -p 0 -t 100 --reversion random -c fixed -f 0.05 -e cons_fixed05_random
 echo cons_fixed10_random
