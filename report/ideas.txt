@@ -7,19 +7,6 @@ todo
 
   use public last price for marking wealth
 
-  rename closeness to spread?
-    bigger is less close
-
-
-  stopping conditions
-    wait until x empty trades
-    could use variation in public last mrs
-    could have fixed numbers
-    wait until X% of recent trades are empty
-    choice of finish count?
-      seems like high finish count can avoid the need for backtracking
-      very important for dumb trades
-
   time metrics
     wall clock
     pairs (all trades)
@@ -37,7 +24,7 @@ summary statistics
     D%wealth
     time (time/round)
     Dutility
-    mrs closeness
+    mrs spread
     constrainedness
     
     should these be averaged over Z rounds?
@@ -103,6 +90,11 @@ what happens in an individual day
     could use variation in public last mrs
     could have fixed numbers
     wait until X% of recent trades are empty
+    could check every trader?
+    choice of finish count?
+      scaled per trader
+      seems like high finish count can avoid the need for backtracking
+      very important for dumb trades
 
 across rounds
 =============

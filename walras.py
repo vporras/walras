@@ -287,14 +287,16 @@ def trade_random(traders, min_size, dynamic, utility_only):
         return(a.trade(b, min_size, dynamic))
 
 def do_round(config, traders, round):
-    # wait for until the last [finish_count] trades have been 0-size
+    # wait for until the last [finish_count * num_traders] trades have been 0-size
     consecutive_zero_trades = 0
     total_trades = 0
-    while consecutive_zero_trades < config.finish_count:
+    zero_trades = 0
+    while consecutive_zero_trades < config.finish_count * config.num_traders:
         size = trade_random(traders, config.min_size, config.dynamic, config.utility_only)
         total_trades += 1
         if size == 0:
             consecutive_zero_trades += 1
+            zero_trades += 1
         else:
             consecutive_zero_trades = 0
 
@@ -347,7 +349,7 @@ def write_log(config, w, u, m, c):
         obj["config"] = vars(config)
         obj["wealths"] = w.tolist()
         obj["utilities"] = u.tolist()
-        obj["mrs closeness"] = m.tolist()
+        obj["mrs spread"] = m.tolist()
         obj["constrainedness"] = c.tolist()
 
         i = 0
@@ -367,20 +369,20 @@ class TrialSummary():
             return tuple.__new__(cls, (w, u, m, c, s))
 
         def __getnewargs__(self):
-            return (self.wealth, self.utility, self.mrs_closeness, self.constrainedness, self.seconds)
+            return (self.wealth, self.utility, self.mrs_spread, self.constrainedness, self.seconds)
 
         wealth          = property(itemgetter(0))
         utility         = property(itemgetter(1))
-        mrs_closeness   = property(itemgetter(2))
+        mrs_spread   = property(itemgetter(2))
         constrainedness = property(itemgetter(3))
         seconds         = property(itemgetter(4))
 
 
-        # def __new__(cls, seconds, wealth, utility, mrs_closeness, constrainedness):
+        # def __new__(cls, seconds, wealth, utility, mrs_spread, constrainedness):
 
         @classmethod
-        def from_idx(cls, idx, wealth, utility, mrs_closeness, constrainedness, seconds):
-            return cls(wealth[idx], utility[idx], mrs_closeness[idx], constrainedness[idx], seconds[idx])
+        def from_idx(cls, idx, wealth, utility, mrs_spread, constrainedness, seconds):
+            return cls(wealth[idx], utility[idx], mrs_spread[idx], constrainedness[idx], seconds[idx])
 
         def __add__(self, other):
             if other is None or other is 0:
@@ -395,7 +397,7 @@ class TrialSummary():
 
         def __str__(self):
             return ("W: %.3f U: %.3f M: %.3f C: %.3f S: %2.2f"
-                    % (self.wealth, self.utility, self.mrs_closeness, self.constrainedness, self.seconds))
+                    % (self.wealth, self.utility, self.mrs_spread, self.constrainedness, self.seconds))
 
     def find_div(self, config, u, m):
         bsz = config.bucket_size
@@ -427,15 +429,15 @@ class TrialSummary():
             
         return conv_idx
 
-    def __init__(self, config, wealth, utility, mrs_closeness, constrainedness, seconds):
+    def __init__(self, config, wealth, utility, mrs_spread, constrainedness, seconds):
         self.seed = config.seed
-        self.end  = self.Stats.from_idx(config.rounds - 1, wealth, utility, mrs_closeness, constrainedness, seconds)
-        self.div_idx = self.find_div(config, utility, mrs_closeness)
+        self.end  = self.Stats.from_idx(config.rounds - 1, wealth, utility, mrs_spread, constrainedness, seconds)
+        self.div_idx = self.find_div(config, utility, mrs_spread)
         self.did_div = self.div_idx >= 0
         self.conv_idx = self.find_conv(config, wealth)
         self.did_conv = self.conv_idx >= 0 and not self.did_div or self.conv_idx < self.div_idx
         if self.did_conv:
-            self.conv = self.Stats.from_idx(self.conv_idx, wealth, utility, mrs_closeness, constrainedness, seconds)
+            self.conv = self.Stats.from_idx(self.conv_idx, wealth, utility, mrs_spread, constrainedness, seconds)
             
 
     def __str__(self):
@@ -465,7 +467,7 @@ def do_trial(config, results):
 
     wealths         = np.empty([config.rounds])
     utilities       = np.empty([config.rounds])
-    mrs_closeness   = np.empty([config.rounds])
+    mrs_spread   = np.empty([config.rounds])
     constrainedness = np.empty([config.rounds])
     seconds         = np.empty([config.rounds])
         
@@ -474,19 +476,20 @@ def do_trial(config, results):
         _, w, u, m, c, t = do_round(config, traders, i)
         wealths[i] = w
         utilities[i] = u
-        mrs_closeness[i] = m
+        mrs_spread[i] = m
         constrainedness[i] = c
         seconds[i] = time() - start_time
     
         for t in traders:
             t.reset()
 
-    write_log(config, wealths, utilities, mrs_closeness, constrainedness) 
+    write_log(config, wealths, utilities, mrs_spread, constrainedness) 
 
-    summary = TrialSummary(config, wealths, utilities, mrs_closeness, constrainedness, seconds)
+    summary = TrialSummary(config, wealths, utilities, mrs_spread, constrainedness, seconds)
     if config.verbosity >= 2:
-        print("\n")
+        print()
         print(summary)
+        print()
 
     results.put(summary)
 
@@ -499,7 +502,7 @@ def do_trial(config, results):
         plt.figure("seed %d" % config.seed, figsize=(10,8))
         plt.plot(wealths,         label="wealth transfers (%)")
         plt.plot(utilities,       label="utility gains (%)")
-        plt.plot(mrs_closeness,   label="mrs closeness (stddev)")
+        plt.plot(mrs_spread,   label="mrs spread (stddev)")
         plt.plot(constrainedness, label="constrainedness %")
 
     
@@ -565,8 +568,8 @@ if __name__ == "__main__":
     parser.add_argument("-m", "--min-size", type=float, default=0.01,
                         help="minimum size of trade (default: 0.01)")
     parser.add_argument("-d", "--dynamic", action="store_true", help="dynamic size (binary search)")
-    parser.add_argument("--finish-count", type=int, default=25,
-                        help="number of empty trades to finish a round (default: 25)")
+    parser.add_argument("--finish-count", type=float, default=1.0,
+                        help="number of empty trades per trader to finish a round (default: 1.0)")
     parser.add_argument("-u", "--utility-only", action="store_true", help="don't use derivatives of utility function")
 
     # Constraint args
@@ -587,14 +590,14 @@ if __name__ == "__main__":
                         help="backtrack if utility has fallen below [THRESHOLD] * previous (default: 0.95)")
 
     # Summary args
-    parser.add_argument("--bucket-size", type=int, default=5,
-                        help="number of rounds to average when calculating convergence and divergence (default: 5)")
+    parser.add_argument("--bucket-size", type=int, default=10,
+                        help="number of rounds to average when calculating convergence and divergence (default: 10)")
     # parser.add_argument("--conv-threshold", type=float, default=0.005,
     #                     help="register convergence if moving average wealths are within [THRESHOLD] (default: 0.005)")
     parser.add_argument("--div-utility-drop", type=float, default=0.05,
                         help="drop in utility necessary for divergence (default: 0.05)")
     parser.add_argument("--div-mrs-min", type=float, default=0.05,
-                        help="minimun mrs closeness for divergence (default: 0.05)")
+                        help="minimun mrs spread for divergence (default: 0.05)")
 
     # Plotting args
     parser.add_argument("-p", "--plotting", type=int, default=1,
