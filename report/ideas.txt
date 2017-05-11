@@ -1,30 +1,30 @@
 todo
 ====
-  set up testing harness
-    summary stats
   pick list of interesting experiments
+    focus on death spirals and robustness to randomness
   read other papers
-  create centrally planned system for comparison
 
-  choice of finish count?
-    seems like high finish count can avoid the need for backtracking
-    very important for dumb trades
 
-  private mrss or public last traded mrss?
-    could use public for stopping condition
-    at least as good as stopping for zero trades
-    should use private last trade for constraint calculation
+  use public last price for marking wealth
 
-  measure utility gains
-    per trader?
-    as percent gains?
+  rename closeness to spread?
+    bigger is less close
 
-  use VWAP instead of last price to calculate
-    wealth?
-    constraints?
 
-  average stats over a few rounds to reduce noice?
-    might be important when measuring variance across seeds
+  stopping conditions
+    wait until x empty trades
+    could use variation in public last mrs
+    could have fixed numbers
+    wait until X% of recent trades are empty
+    choice of finish count?
+      seems like high finish count can avoid the need for backtracking
+      very important for dumb trades
+
+  time metrics
+    wall clock
+    pairs (all trades)
+      seem more natural to Paul
+    calls to oracles (sensitive to dynamic sizing)
 
 
 summary statistics 
@@ -51,23 +51,22 @@ summary statistics
 time metrics
 ============
   wall clock
-  days
+  rounds
   pairs (all trades)
   non-zero trades
   calls to oracles (sensitive to dynamic sizing)
 
 convergence criteria
 ====================
-  moving averages of [wealths/utilities] are equal within tolerance
-  below threshold X of
-    wealths
-    Dwealth since start
+  moving averages of [wealths/utilities] are within moving standard deviation of each other
+  must be before divergence
+    TODO: or disallows divergence?
   
   
 divergence criteria
 ===================
   diff of moving averages of utilities is negative outside tolerance
-  moving avg of mrs is high
+  mrs is high
 
 
 motivation
@@ -179,10 +178,3 @@ figures
   1 day among 2, 3, 4 traders
   across time for 100 traders
   bar charts comparing experiments
-  
-
-
-
-
-
-

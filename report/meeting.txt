@@ -1,0 +1,118 @@
+outline of report
+=================
+  introduction
+    brief motivation
+    summarize results 
+
+
+  background
+    what is walrasian equilibrium?
+    divisible vs indivisible goods
+    centralized vs decentralized
+      information we have access to
+    what are the centralized solutions?
+      tatonnement
+      simplex cutting
+
+
+  model
+    2 goods
+    utility function
+      Cobb-Douglass
+    bilateral trade over a day
+      plus-utility trades only
+    wealth loss & constraints
+      FIGURE: price/volume for 1 trader over a couple days
+        area over curve is wealth lost
+        show constraints
+
+
+  implementation
+    single day
+      FIGURE: small number of traders on one day
+      picking price
+      stopping conditions
+
+    multiple day
+      useful statistics
+        wealth transfer
+        average utility gain
+        mrs closeness
+        constrainedness
+      FIGURE: convergence with simple model
+
+    trade sizing
+      FIGURE: static and dynamic on one day
+      EXP: static
+      EXP: dyanmic
+        
+    number of traders?
+      FIGURE: comparison with different numbers of traders
+      EXP: simple model over various numbers
+
+    convergence
+      significance
+      conditions
+      speed & quality
+
+    divergence - death spirals
+      FIGURE: convergence then death spiral
+      conditions
+      cause
+      prevention
+
+    time & complexity
+      clock
+      calls to oracle
+
+    testing
+      choosing number of rounds
+      random allocations, but same seed for each model
+      summary statistics
+        % convergence
+        % divergence
+        convergence and final stats
+
+
+  experimentation
+    constraint type
+      EXP: fixed
+      EXP: last price
+      EXP: mean (of cur constraint & last price)
+      EXP: VWAP
+    reversion method
+      EXP: mean
+      EXP: total
+      EXP: random?
+    FIGURE: bar charts comparing methods
+
+    backtracking
+      justification
+        longer term relationships
+        many variables being optimized at once
+          could lose utility due to
+            randomness
+            my actions
+            others' actions
+      EXP: single backtrack
+      EXP: multiple backtrack
+      EXP: diff backtrack probabilities
+      EXP: diff backtrack thresholds
+
+    stability across seeds
+      EXP: same allocations, different seeds
+
+    relaxing the differentiablity assumption
+      same utility function
+        EXP: normal vs random mrs
+
+      different utility function
+        EXP: leontief? 
+        EXP: randomised utility function?
+
+
+  conclusion
+    comparing this model to centralized
+      advantages and disadvantages
+    how could this be useful?
+

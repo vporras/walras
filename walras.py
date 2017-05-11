@@ -14,8 +14,6 @@ from operator import itemgetter
 BUY_CONSTRAINT = 10
 SELL_CONSTRAINT = 0.1
 
-bench_time = 0
-
 class Dir(Enum):
     """Direction of trade in terms of good 1"""
     buy = 1
@@ -217,11 +215,8 @@ class Trader():
 
     
     def trade(self, other, min_size, dynamic):
-        global bench_time
         dir = self.get_dir(other) 
-        start = time()
         joint_mrs = self.joint_mrs(other, dir)
-        bench_time += time() - start
         size = self.get_size(other, dir, joint_mrs, min_size, dynamic)
 
         if size != 0:
@@ -310,11 +305,12 @@ def do_round(config, traders, round):
     # filter out the ones without a last trade
     mrss = mrss_raw[mrss_raw != np.array(None)]
     dw = [t.d_wealth() / total_wealth for t in traders]
-    du = [t.d_utility() for t in traders]
+    starting_u = np.average([t.utility(t.endowment) for t in traders])
+    du = [t.d_utility() for t in traders] / starting_u
     C = np.log(BUY_CONSTRAINT) - np.log(SELL_CONSTRAINT)
     c = [(np.log(t.buy_constraints[t.round]) - np.log(t.sell_constraints[t.round])) / C * 2 - 1 for t in traders]
     # TODO: should this include empty trades?
-    res = (round, sum(np.abs(dw)) / 2, sum(du), np.std(mrss), np.mean(c), total_trades/config.num_traders)
+    res = (round, sum(np.abs(dw)) / 2, np.average(du), np.std(mrss), np.mean(c), total_trades/config.num_traders)
     if config.verbosity >= 3:
         print("%4d W: %.3f U: %.3f M: %.3f C: %.3f T: %2.2f" % res)
 
@@ -343,13 +339,12 @@ def random_traders(n, config):
     return [Trader(i, random.random(), (random.random(),random.random()), config)
             for i in range(n)]
 
-def write_log(config, elapsed, w, u, m, c):
+def write_log(config, w, u, m, c):
     
     if config.log_path:
         obj = {}
         obj["command"] = " ".join(sys.argv)
         obj["config"] = vars(config)
-        obj["elapsed"] = elapsed
         obj["wealths"] = w.tolist()
         obj["utilities"] = u.tolist()
         obj["mrs closeness"] = m.tolist()
@@ -402,32 +397,40 @@ class TrialSummary():
             return ("W: %.3f U: %.3f M: %.3f C: %.3f S: %2.2f"
                     % (self.wealth, self.utility, self.mrs_closeness, self.constrainedness, self.seconds))
 
+    def find_div(self, config, u, m):
+        bsz = config.bucket_size
+        div_idx = -1
+        for i in range(bsz, config.rounds - bsz + 1):
+            trailing  = np.average(u[i - bsz : i])
+            leading   = np.average(u[i       : i + bsz])
+            # trailing window so new outliers don't skew it
+            # threshold = np.std    (u[i - bsz : i]) * 2 
+            m_max     =        max(m[i       : i + bsz])
+            # print("%d %0.5f %0.5f" % (i, trailing - leading, m_max))
+            if trailing - leading > config.div_utility_drop and m_max > config.div_mrs_min:
+                div_idx = i
+                break
+            
+        return div_idx
+
     def find_conv(self, config, w):
         bsz = config.bucket_size
-        trailing = sum(w[0   : bsz])   / bsz
-        leading  = sum(w[bsz : bsz*2]) / bsz
-        var   = np.var(w[0   : bsz*2])
         conv_idx = -1
-        for i in range(bsz, config.rounds - bsz): #TODO possibly +1 at end?
-
-            var2 = np.var(w[i - bsz : i + bsz])
-            print("%d %0.5f %0.5f %0.5f" % (i, abs(trailing - leading), var, var2))
-            if abs(trailing - leading) < config.conv_threshold:
+        for i in range(bsz, config.rounds - bsz + 1):
+            trailing = np.average(w[i - bsz : i])
+            leading  = np.average(w[i       : i + bsz])
+            std      = np.std    (w[i - bsz : i + bsz])
+            # print("%d %0.5f %0.5f" % (i, abs(trailing - leading), std))
+            if abs(trailing - leading) < std:
                 conv_idx = i
                 break
-            dvar = w[i - bsz] - (trailing + leading)/2
-            print((trailing + leading)/2)
-            trailing += (w[i]       - w[i - bsz]) / bsz
-            leading  += (w[i + bsz] - w[i]      ) / bsz
-            print((trailing + leading)/2)
-            var += (w[i + bsz] - w[i - bsz]) * (w[i + bsz] - (trailing + leading)/2 + dvar) / (bsz - 1)
             
         return conv_idx
 
     def __init__(self, config, wealth, utility, mrs_closeness, constrainedness, seconds):
         self.seed = config.seed
         self.end  = self.Stats.from_idx(config.rounds - 1, wealth, utility, mrs_closeness, constrainedness, seconds)
-        self.div_idx = -1
+        self.div_idx = self.find_div(config, utility, mrs_closeness)
         self.did_div = self.div_idx >= 0
         self.conv_idx = self.find_conv(config, wealth)
         self.did_conv = self.conv_idx >= 0 and not self.did_div or self.conv_idx < self.div_idx
@@ -441,6 +444,8 @@ class TrialSummary():
         if self.did_conv:
             res += "\nconv idx: %d" % self.conv_idx
             res += "\nconv: %s" % str(self.conv)
+        if self.did_div:
+            res += "\ndiv idx: %d" % self.div_idx
         return res
 
 def do_trial(config, results):
@@ -476,17 +481,11 @@ def do_trial(config, results):
         for t in traders:
             t.reset()
 
-    elapsed = time() - start_time
-    global bench_time
-
-    #if config.verbosity >= 2:
-        # print("%3.2f seconds elapsed" % elapsed)
-        # print("%3.2f bench time" % bench_time)
-
-    write_log(config, elapsed, wealths, utilities, mrs_closeness, constrainedness) 
+    write_log(config, wealths, utilities, mrs_closeness, constrainedness) 
 
     summary = TrialSummary(config, wealths, utilities, mrs_closeness, constrainedness, seconds)
     if config.verbosity >= 2:
+        print("\n")
         print(summary)
 
     results.put(summary)
@@ -494,12 +493,12 @@ def do_trial(config, results):
     if config.plotting >= 1 and config.rounds > 1:
         # normalization to make it fit on plot with other variables
         # utilities /= max(utilities)
-        utilities /= config.num_traders / 5
+        # utilities /= config.num_traders / 5
 
 
-        plt.figure("multiround data", figsize=(10,8))
+        plt.figure("seed %d" % config.seed, figsize=(10,8))
         plt.plot(wealths,         label="wealth transfers (%)")
-        plt.plot(utilities,       label="utility gains")
+        plt.plot(utilities,       label="utility gains (%)")
         plt.plot(mrs_closeness,   label="mrs closeness (stddev)")
         plt.plot(constrainedness, label="constrainedness %")
 
@@ -523,17 +522,28 @@ def run(config):
     for i in range(0, config.trials):
         data.append(results.get())
 
-    avg_end = sum([d.end for d in data]) / config.trials
-    pct_conv = len([d for d in data if d.did_conv]) / config.trials * 100
-    combined = "converged: %3.f%%\nend: %s" % (pct_conv, str(avg_end))
+    avg_end  = sum([d.end for d in data]) / config.trials 
+    num_conv = len([d for d in data if d.did_conv]) 
+    if num_conv > 0:
+        avg_conv = sum([d.conv for d in data if d.did_conv]) / num_conv
+    pct_conv = num_conv / config.trials * 100
+    pct_div  = len([d for d in data if d.did_div]) / config.trials * 100
+
+    combined = "end: %s" % str(avg_end)
+    if pct_conv > 0:
+        combined += "\nconv: %s" % str(avg_conv)
+    combined += "\nconverged: %3.f%%" % pct_conv
+    combined += "\ndiverged: %3.f%%" % pct_div
+
+    if config.verbosity >= 1:
+        print(combined)
 
     i = 0
-    while os.path.exists("results/%d_%d" % (config.experiment, i)):
+    while os.path.exists("results/%s_%d" % (config.experiment, i)):
         i += 1
-    with open("results/%d_%d" % (config.experiment, i), "w") as f:
+    with open("results/%s_%d" % (config.experiment, i), "w") as f:
+        print(" ".join(sys.argv), file=f)
         print(combined, file=f)
-        if config.verbosity >= 1:
-            print(combined)
 
 
 
@@ -547,8 +557,8 @@ if __name__ == "__main__":
                         help="integer seed to initialize PRNG")
     parser.add_argument("-t", "--trials", type=int, default=1,
                         help="number of trials to test on, incrementing seed by 1 each time")
-    parser.add_argument("-e", "--experiment", type=int, default=0,
-                        help="id of experiment being run")
+    parser.add_argument("-e", "--experiment", default="test",
+                        help="name of experiment being run")
 
     # Intraday args
     parser.add_argument("--trader-file", help="file to load traders from")
@@ -579,8 +589,12 @@ if __name__ == "__main__":
     # Summary args
     parser.add_argument("--bucket-size", type=int, default=5,
                         help="number of rounds to average when calculating convergence and divergence (default: 5)")
-    parser.add_argument("--conv-threshold", type=float, default=0.005,
-                        help="register convergence if moving average wealths are within [THRESHOLD] (default: 0.005)")
+    # parser.add_argument("--conv-threshold", type=float, default=0.005,
+    #                     help="register convergence if moving average wealths are within [THRESHOLD] (default: 0.005)")
+    parser.add_argument("--div-utility-drop", type=float, default=0.05,
+                        help="drop in utility necessary for divergence (default: 0.05)")
+    parser.add_argument("--div-mrs-min", type=float, default=0.05,
+                        help="minimun mrs closeness for divergence (default: 0.05)")
 
     # Plotting args
     parser.add_argument("-p", "--plotting", type=int, default=1,
