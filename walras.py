@@ -156,7 +156,7 @@ class Trader():
             return 0
 
     def mrs(self, dir):
-        # This is the exchange rate between x1 and x2, in terms of x1.
+        # This is the exchange rate between x1 and x2, x2 per x1.
         # eg if mrs(Dir.buy) == 5.0, then the trader is willing to pay up to 5 units
         #   of x2 in order to get one unit of x1
         alpha = self.preference

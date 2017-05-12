@@ -5,7 +5,7 @@ outline of report
     summarize results 
 
 
-  background
+  background & related work
     what is walrasian equilibrium?
     divisible vs indivisible goods
     centralized vs decentralized
@@ -19,8 +19,11 @@ outline of report
     2 goods
     utility function
       Cobb-Douglass
+      gradients
     bilateral trade over a day
+      MRS
       plus-utility trades only
+      FIGURE: closeup of buy/sell gradients at allocation, with potential trades
     wealth loss & constraints
       FIGURE: price/volume for 1 trader over a couple days
         area over curve is wealth lost

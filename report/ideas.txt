@@ -6,6 +6,8 @@ todo
 
   should convergence before divergence count?
 
+  rename MRS to price?
+
 
 summary statistics 
 ==================

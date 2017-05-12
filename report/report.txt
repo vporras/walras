@@ -1,0 +1,41 @@
+
+Model
+    This project focuses on simulating a world with two divisible goods that can be exchanged between a number of traders.
+
+    The _marginal rate of substitution_ between our two goods will be used throughout to represent price.
+    It applies to both actual and potential trades.
+    We always express the MRS and gradient (defined below) as units of good 2 per unit good 1.
+    For instance, a trade of 4 units of good 1 for 1 unit of good 2 has an MRS of 0.25.
+
+    The _direction_ of a trade is either "Buy" or "Sell", from the perspective of a given trader.
+    Direction is also expressed in terms of good 1, so a "Buy" means the trader is gaining good 1 by giving up good 2.
+
+    Utility functions capture the preferences of the actors in an economic model.
+    Utility is often identified with the pleasure or satisfaction that an actor gets from a situation.
+    The utility is defined such that people always prefer an outcome with higher utility to one with lower 
+    In general, a utility function is a function from states of the world to utilities.
+    In our case, it will be a function from allocations of our two goods to utilities.
+
+    We will often refer to the gradient of the utility function at a certain allocation.
+    This gradient bounds the MRS of an infinitesimally small trade at that point.
+    A trader will not buy Good1 in a trade with an MRS that is higher than their gradient, because they would lose utility.  
+
+    For the first part of the project, we use a special kind of utility function called Cobb-Douglass.
+    
+
+
+Implementation
+
+  Single Day
+
+    Each day of the simulation begins by giving each trader their initial endowment.
+    Then, pairs of traders are randomly selected to attempt a trade.
+    Each trader has access to their utility functions and the gradients of those functions for any allocation.
+    From the gradient and any constraints, we calculate two MRSs for each trader, one for each direction.
+    The direction of the potential trade (Trader1 buying from T2 or vice versa) is chosen based on the differences between their MRSs.
+    The trader with the higher MRS is the one who buys Good 1.
+
+    Then, we calculate the size of the biggest possible trade that can occur at that price.
+    A trade can occur if, after reallocation, both traders would have higher utilities.
+    We test progressively larger sizes, doubling each time.
+    Because the gradient only applies to infinitesimally small sizes, when the MRSs are very similar, the minimum size might not be possible.
