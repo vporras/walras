@@ -10,6 +10,11 @@ from time import time
 from enum import Enum
 from operator import itemgetter
 
+import warnings
+
+warnings.simplefilter("error")
+
+
 # TODO pick good defaults here
 BUY_CONSTRAINT = 10
 SELL_CONSTRAINT = 0.1
@@ -312,12 +317,14 @@ def do_round(config, traders, round):
     mrss_raw = np.array([t.last_trade_mrs for t in traders])
     # filter out the ones without a last trade
     mrss = mrss_raw[mrss_raw != np.array(None)]
+    if len(mrss) == 0:
+        mrss = [0]
     dw = [t.d_wealth(Trader.last_trade_mrs) / total_wealth for t in traders]
     starting_u = np.average([t.utility(t.endowment) for t in traders])
     du = [t.d_utility() for t in traders] / starting_u
     C = np.log(BUY_CONSTRAINT) - np.log(SELL_CONSTRAINT)
     c = [(np.log(t.buy_constraints[t.round]) - np.log(t.sell_constraints[t.round])) / C * 2 - 1 for t in traders]
-    # TODO: should this include empty trades?
+    # TODO: should this not include empty trades?
     res = (round, sum(np.abs(dw)) / 2, np.average(du), np.std(mrss), np.mean(c), total_trades/config.num_traders)
     if config.verbosity >= 3:
         print("%4d W: %.3f U: %.3f M: %.3f C: %.3f T: %2.2f" % res)
