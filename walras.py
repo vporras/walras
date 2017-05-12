@@ -414,7 +414,7 @@ class TrialSummary():
         for i in range(config.rounds - 2, -1, -1):
             max_w = max(w[i], max_w)
             min_w = min(w[i], min_w)
-            print("%d %0.5f" % (i, abs(max_w - min_w)))
+            #print("%d %0.5f" % (i, abs(max_w - min_w)))
             if max_w - min_w > config.conv_threshold:
                 if config.rounds - i > config.conv_min_rounds:
                     conv_idx = i + 1
