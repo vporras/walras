@@ -392,32 +392,32 @@ class TrialSummary():
             return ("W: %.3f U: %.3f M: %.3f C: %.3f S: %2.2f T: %3.2f"
                     % (self.wealth, self.utility, self.mrs_spread, self.constrainedness, self.seconds, self.trades))
 
+    # divergence is drop of threshold below beginning and mrs over min
     def find_div(self, config, u, m):
-        bsz = config.bucket_size
+        bsz = config.div_bucket_size
         div_idx = -1
-        for i in range(bsz, config.rounds - bsz + 1):
-            trailing  = np.average(u[i - bsz : i])
-            leading   = np.average(u[i       : i + bsz])
-            # trailing window so new outliers don't skew it
-            # threshold = np.std    (u[i - bsz : i]) * 2 
-            m_max     =        max(m[i       : i + bsz])
-            # print("%d %0.5f %0.5f" % (i, trailing - leading, m_max))
-            if trailing - leading > config.div_utility_drop and m_max > config.div_mrs_min:
+        u_start = np.average(u[0 : bsz])
+        for i in range(bsz, config.rounds):
+            u_cur     = np.average(u[i : i + bsz])
+            m_max     =        max(m[i : i + bsz])
+            # print("%d %0.5f %0.5f" % (i, u_start - u_cur, m_max))
+            if u_start - u_cur > config.div_utility_drop and m_max > config.div_mrs_threshold:
                 div_idx = i
                 break
             
         return div_idx
 
     def find_conv(self, config, w):
-        bsz = config.bucket_size
         conv_idx = -1
-        for i in range(bsz, config.rounds - bsz + 1):
-            trailing = np.average(w[i - bsz : i])
-            leading  = np.average(w[i       : i + bsz])
-            std      = np.std    (w[i - bsz : i + bsz])
-            # print("%d %0.5f %0.5f" % (i, abs(trailing - leading), std))
-            if abs(trailing - leading) < std:
-                conv_idx = i
+        max_w = w[config.rounds - 1]
+        min_w = max_w
+        for i in range(config.rounds - 2, -1, -1):
+            max_w = max(w[i], max_w)
+            min_w = min(w[i], min_w)
+            print("%d %0.5f" % (i, abs(max_w - min_w)))
+            if max_w - min_w > config.conv_threshold:
+                if config.rounds - i > config.conv_min_rounds:
+                    conv_idx = i + 1
                 break
             
         return conv_idx
@@ -428,7 +428,7 @@ class TrialSummary():
         self.div_idx = self.find_div(config, utility, mrs_spread)
         self.did_div = self.div_idx >= 0
         self.conv_idx = self.find_conv(config, wealth)
-        self.did_conv = self.conv_idx >= 0 and not self.did_div or self.conv_idx < self.div_idx
+        self.did_conv = self.conv_idx >= 0 and not self.did_div
         if self.did_conv:
             self.conv = self.Stats.from_idx(self.conv_idx, wealth, utility, mrs_spread, constrainedness, seconds, trades)
             
@@ -524,24 +524,35 @@ def run(config):
     num_conv = len([d for d in data if d.did_conv]) 
     if num_conv > 0:
         avg_conv = sum([d.conv for d in data if d.did_conv]) / num_conv
-    pct_conv = num_conv / config.trials * 100
-    pct_div  = len([d for d in data if d.did_div]) / config.trials * 100
+    pct_conv = num_conv / config.trials
+    pct_div  = len([d for d in data if d.did_div]) / config.trials
 
-    combined = "end: %s" % str(avg_end)
+    # We make two strings, human and machine readable
+
+    human = "end: %s" % str(avg_end)
     if pct_conv > 0:
-        combined += "\nconv: %s" % str(avg_conv)
-    combined += "\nconverged: %3.f%%" % pct_conv
-    combined += "\ndiverged: %3.f%%" % pct_div
+        human += "\nconv: %s" % str(avg_conv)
+    human += "\nconverged: %3.f%%" % (pct_conv * 100)
+    human += "\ndiverged: %3.f%%" % (pct_div * 100)
+
+    # hack to fix printing later
+    if pct_conv == 0:
+        avg_conv = [np.nan] * 6
+    mach = [str(x) for x in [config.experiment, pct_div, pct_conv, *avg_conv, *avg_end]]
 
     if config.verbosity >= 1:
-        print(combined)
+        print("seed conv  div")
+        for d in data:
+            print("%4d %4d %4d" % (d.seed, d.conv_idx, d.div_idx))
+        print(human)
 
     i = 0
     while os.path.exists("results/%s_%d" % (config.experiment, i)):
         i += 1
     with open("results/%s_%d" % (config.experiment, i), "w") as f:
         print(" ".join(sys.argv), file=f)
-        print(combined, file=f)
+        print(human, file=f)
+        print(",".join(mach), file=f)
 
 
 
@@ -584,14 +595,16 @@ if __name__ == "__main__":
                         help="backtrack if utility has fallen below [THRESHOLD] * previous (default: 0.95)")
 
     # Summary args
-    parser.add_argument("--bucket-size", type=int, default=10,
-                        help="number of rounds to average when calculating convergence and divergence (default: 10)")
-    # parser.add_argument("--conv-threshold", type=float, default=0.005,
-    #                     help="register convergence if moving average wealths are within [THRESHOLD] (default: 0.005)")
+    parser.add_argument("--div-bucket-size", type=int, default=10,
+                        help="number of rounds to average when calculating divergence (default: 10)")
     parser.add_argument("--div-utility-drop", type=float, default=0.05,
                         help="drop in utility necessary for divergence (default: 0.05)")
-    parser.add_argument("--div-mrs-min", type=float, default=0.05,
+    parser.add_argument("--div-mrs-threshold", type=float, default=0.05,
                         help="minimun mrs spread for divergence (default: 0.05)")
+    parser.add_argument("--conv-min-rounds", type=int, default=10,
+                        help="convergence when wealths are within threshold for [CONV_MIN_ROUNDS] (default: 10)")
+    parser.add_argument("--conv-threshold", type=float, default=0.01,
+                        help="convergence when wealths are within [THRESHOLD] for min rounds (default: 0.01)")
 
     # Plotting args
     parser.add_argument("-p", "--plotting", type=int, default=1,
