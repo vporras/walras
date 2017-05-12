@@ -18,6 +18,7 @@ warnings.simplefilter("error")
 # TODO pick good defaults here
 BUY_CONSTRAINT = 10
 SELL_CONSTRAINT = 0.1
+DYNAMIC = True
 
 class Dir(Enum):
     """Direction of trade in terms of good 1"""
@@ -202,7 +203,7 @@ class Trader():
        
         return u1_1 > u1_0 and u2_1 > u2_0
 
-    def get_size(self, other, dir, joint_mrs, min_size, dynamic):
+    def get_size(self, other, dir, joint_mrs, min_size):
         size = 0
         if dir == Dir.buy:
             size = min_size
@@ -211,8 +212,8 @@ class Trader():
 
         if self.is_plus_u(other, size, joint_mrs):
             # doubles size and recalculates
-            if dynamic:
-                return max(size, self.get_size(other, dir, joint_mrs, min_size*2, True))
+            if DYNAMIC:
+                return max(size, self.get_size(other, dir, joint_mrs, min_size*2))
             else:
                 return size
         else:
@@ -223,10 +224,10 @@ class Trader():
         self.allocs.append(self.alloc)
 
     
-    def trade(self, other, min_size, dynamic):
+    def trade(self, other, min_size):
         dir = self.get_dir(other) 
         joint_mrs = self.joint_mrs(other, dir)
-        size = self.get_size(other, dir, joint_mrs, min_size, dynamic)
+        size = self.get_size(other, dir, joint_mrs, min_size)
 
         if size != 0:
             self.change_alloc(self.new_alloc(size, joint_mrs))
@@ -238,12 +239,12 @@ class Trader():
         return size
 
     # No access to derivative, so can't guess direction
-    def dumb_trade(self, other, min_size, dynamic):
+    def dumb_trade(self, other, min_size):
         dir = Dir.buy
         # Pick a random price
         # TODO: truncated normal?
         joint_mrs = random.uniform(other.sell_constraints[self.round], self.buy_constraints[self.round])
-        size = self.get_size(other, Dir.buy, joint_mrs, min_size, dynamic)
+        size = self.get_size(other, Dir.buy, joint_mrs, min_size)
 
         if size != 0:
             self.change_alloc(self.new_alloc(size, joint_mrs))
@@ -290,12 +291,12 @@ class Trader():
             preference = self.preference,
             alloc = self.alloc))
 
-def trade_random(traders, min_size, dynamic, utility_only):
+def trade_random(traders, min_size, utility_only):
     a,b = random.sample(traders,2)
     if utility_only:
-        return(a.dumb_trade(b, min_size, dynamic))
+        return(a.dumb_trade(b, min_size))
     else:
-        return(a.trade(b, min_size, dynamic))
+        return(a.trade(b, min_size))
 
 def do_round(config, traders, round):
     # wait for until the last [finish_count * num_traders] trades have been 0-size
@@ -303,7 +304,7 @@ def do_round(config, traders, round):
     total_trades = 0
     zero_trades = 0
     while consecutive_zero_trades < config.finish_count * config.num_traders:
-        size = trade_random(traders, config.min_size, config.dynamic, config.utility_only)
+        size = trade_random(traders, config.min_size, config.utility_only)
         total_trades += 1
         if size == 0:
             consecutive_zero_trades += 1
@@ -392,7 +393,7 @@ class TrialSummary():
             return ("W: %.3f U: %.3f M: %.3f C: %.3f S: %2.2f T: %3.2f"
                     % (self.wealth, self.utility, self.mrs_spread, self.constrainedness, self.seconds, self.trades))
 
-    # divergence is drop of threshold below beginning and mrs over min
+    # divergence is a drop below beginning - threshold and mrs over min
     def find_div(self, config, u, m):
         bsz = config.div_bucket_size
         div_idx = -1
@@ -572,7 +573,7 @@ if __name__ == "__main__":
     parser.add_argument("--trader-file", help="file to load traders from")
     parser.add_argument("-m", "--min-size", type=float, default=0.01,
                         help="minimum size of trade (default: 0.01)")
-    parser.add_argument("-d", "--dynamic", action="store_true", help="dynamic size (binary search)")
+    # parser.add_argument("-d", "--dynamic", action="store_true", help="dynamic size (binary search)")
     parser.add_argument("--finish-count", type=float, default=1.0,
                         help="number of empty trades per trader to finish a round (default: 1.0)")
     parser.add_argument("-u", "--utility-only", action="store_true", help="don't use derivatives of utility function")

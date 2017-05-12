@@ -8,13 +8,6 @@ todo
   try initial and drawdown divergence
     tune divergence utility drop
 
-  convergence as two stages?
-    determine if there has been convergence (check whether last n are within threshold)
-    find the last point outside that threshold
-  should utility have to converge too?
-
-  should convergence before divergence count?
-
 
 summary statistics 
 ==================
