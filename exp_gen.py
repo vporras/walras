@@ -7,7 +7,7 @@ bs = [[5], [10], [25], [5, 10], [5, 25], [5, 50], [5, 25, 100], [10, 25], [10, 5
 
 for p in ps:
     for t in ts:
-        print("p: %.2f t: %.2f" % (p, t))
+        print('echo "p: %.2f t: %.2f"' % (p, t))
         for b in bs:
             sb = [str(x) for x in b]
             e = "bt_p%2.0f_t%2.0f_%s" % (p * 100, t * 100, "_".join(sb))
