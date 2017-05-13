@@ -365,18 +365,18 @@ class TrialSummary():
             return tuple.__new__(cls, (w, u, m, c, s, t))
 
         def __getnewargs__(self):
-            return (self.wealth, self.utility, self.mrs_spread, self.constrainedness, self.seconds, self.trades)
+            return (self.wealth, self.utility, self.mrs_deviation, self.constrainedness, self.seconds, self.trades)
 
         wealth          = property(itemgetter(0))
         utility         = property(itemgetter(1))
-        mrs_spread      = property(itemgetter(2))
+        mrs_deviation      = property(itemgetter(2))
         constrainedness = property(itemgetter(3))
         seconds         = property(itemgetter(4))
         trades          = property(itemgetter(5))
 
         @classmethod
-        def from_idx(cls, idx, wealth, utility, mrs_spread, constrainedness, seconds, trades):
-            return cls(wealth[idx], utility[idx], mrs_spread[idx], constrainedness[idx], seconds[idx], trades[idx])
+        def from_idx(cls, idx, wealth, utility, mrs_deviation, constrainedness, seconds, trades):
+            return cls(wealth[idx], utility[idx], mrs_deviation[idx], constrainedness[idx], seconds[idx], trades[idx])
 
         def __add__(self, other):
             if other is None or other is 0:
@@ -391,7 +391,7 @@ class TrialSummary():
 
         def __str__(self):
             return ("W: %.3f U: %.3f M: %.3f C: %.3f S: %2.2f T: %3.2f"
-                    % (self.wealth, self.utility, self.mrs_spread, self.constrainedness, self.seconds, self.trades))
+                    % (self.wealth, self.utility, self.mrs_deviation, self.constrainedness, self.seconds, self.trades))
 
     # divergence is a drop below beginning - threshold and mrs over min
     def find_div(self, config, u, m):
@@ -423,15 +423,15 @@ class TrialSummary():
             
         return conv_idx
 
-    def __init__(self, config, wealth, utility, mrs_spread, constrainedness, seconds, trades):
+    def __init__(self, config, wealth, utility, mrs_deviation, constrainedness, seconds, trades):
         self.seed = config.seed
-        self.end  = self.Stats.from_idx(config.rounds - 1, wealth, utility, mrs_spread, constrainedness, seconds, trades)
-        self.div_idx = self.find_div(config, utility, mrs_spread)
+        self.end  = self.Stats.from_idx(config.rounds - 1, wealth, utility, mrs_deviation, constrainedness, seconds, trades)
+        self.div_idx = self.find_div(config, utility, mrs_deviation)
         self.did_div = self.div_idx >= 0
         self.conv_idx = self.find_conv(config, wealth)
         self.did_conv = self.conv_idx >= 0 and not self.did_div
         if self.did_conv:
-            self.conv = self.Stats.from_idx(self.conv_idx, wealth, utility, mrs_spread, constrainedness, seconds, trades)
+            self.conv = self.Stats.from_idx(self.conv_idx, wealth, utility, mrs_deviation, constrainedness, seconds, trades)
             
 
     def __str__(self):
@@ -461,7 +461,7 @@ def do_trial(config, results):
 
     wealths         = np.empty([config.rounds])
     utilities       = np.empty([config.rounds])
-    mrs_spread      = np.empty([config.rounds])
+    mrs_deviation      = np.empty([config.rounds])
     constrainedness = np.empty([config.rounds])
     seconds         = np.empty([config.rounds])
     trades          = np.empty([config.rounds])
@@ -472,7 +472,7 @@ def do_trial(config, results):
         _, w, u, m, c, t = do_round(config, traders, i)
         wealths[i] = w
         utilities[i] = u
-        mrs_spread[i] = m
+        mrs_deviation[i] = m
         constrainedness[i] = c
         seconds[i] = time() - start_time
         trades_accum += t
@@ -481,7 +481,7 @@ def do_trial(config, results):
         for t in traders:
             t.reset()
 
-    summary = TrialSummary(config, wealths, utilities, mrs_spread, constrainedness, seconds, trades)
+    summary = TrialSummary(config, wealths, utilities, mrs_deviation, constrainedness, seconds, trades)
     if config.verbosity >= 2:
         print()
         print(summary)
@@ -498,7 +498,7 @@ def do_trial(config, results):
         plt.figure("seed %d" % config.seed, figsize=(10,8))
         plt.plot(wealths,         label="wealth transfers (%)")
         plt.plot(utilities,       label="utility gains (%)")
-        plt.plot(mrs_spread,   label="mrs spread (stddev)")
+        plt.plot(mrs_deviation,   label="mrs deviation (stddev)")
         plt.plot(constrainedness, label="constrainedness %")
 
     
@@ -601,7 +601,7 @@ if __name__ == "__main__":
     parser.add_argument("--div-utility-drop", type=float, default=0.05,
                         help="drop in utility necessary for divergence (default: 0.05)")
     parser.add_argument("--div-mrs-threshold", type=float, default=0.05,
-                        help="minimun mrs spread for divergence (default: 0.05)")
+                        help="minimun mrs deviation for divergence (default: 0.05)")
     parser.add_argument("--conv-min-rounds", type=int, default=10,
                         help="convergence when wealths are within threshold for [CONV_MIN_ROUNDS] (default: 10)")
     parser.add_argument("--conv-threshold", type=float, default=0.01,

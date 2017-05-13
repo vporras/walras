@@ -40,15 +40,10 @@ outline of report
       useful statistics
         wealth transfer
         average utility gain
-        mrs closeness
+        mrs deviation
         constrainedness
       FIGURE: convergence with simple model
 
-    trade sizing
-      FIGURE: static and dynamic on one day
-      EXP: static
-      EXP: dyanmic
-        
     number of traders?
       FIGURE: comparison with different numbers of traders
       EXP: simple model over various numbers
@@ -82,11 +77,10 @@ outline of report
       EXP: fixed
       EXP: last price
       EXP: mean (of cur constraint & last price)
-      EXP: VWAP
     reversion method
       EXP: mean
       EXP: total
-      EXP: random?
+      EXP: random
     FIGURE: bar charts comparing methods
 
     backtracking

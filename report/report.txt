@@ -35,7 +35,73 @@ Implementation
     The direction of the potential trade (Trader1 buying from T2 or vice versa) is chosen based on the differences between their MRSs.
     The trader with the higher MRS is the one who buys Good 1.
 
-    Then, we calculate the size of the biggest possible trade that can occur at that price.
+    In the standard model (see section on other utility functions), we calculate a joint MRS by taking the geometric mean of two MRSs.
+    This joint MRS is the exchange rate used for the potential.
+    We experimented with randomly picking an MRS between the two traders' MRSs, but this was slower and gave worse results.
+
+    Then, we calculate the size of the biggest possible trade that can occur at that MRS.
     A trade can occur if, after reallocation, both traders would have higher utilities.
     We test progressively larger sizes, doubling each time.
     Because the gradient only applies to infinitesimally small sizes, when the MRSs are very similar, the minimum size might not be possible.
+    If the largest size is non-zero, the traders exchange the appropriate goods and the process repeats.
+
+    As we go, we keep track of the most recent MRS each trader agreed to trade at. We use this later on to assess the quality of the simulation.
+
+    The simulation of a day ends once traders can make no more mutually beneficial trades.
+    To check for this, we track the number of consecutive attempted trades that are rejected. 
+    For a simulation with n traders, we wait for n consecutive such empty trades.
+    There is a parameter (--finish-count) that can increase or decrease this, but we found in practice that n gives just as good results as 2n or 5n, and is faster.
+
+  Updating Constraints
+    In order to have useful changes from one day to the next, the traders must change their behavior.
+    They achieve this by updating the constraints on the MRSs they will accept for buying and selling.
+
+    Using the definition of wealth from above, and the last MRS used globally, each trader calculates the wealth they gained or lost during the day.
+
+    Recall that no traders will accept trades that cause them to lose utility. 
+    Thus, we can calculate the non-negative utility gain by subtracting the utility of the initial endowment from the utility of the final allocation after a day's worth of trades.
+
+    First, if the trader updated their constraint from the previous day, they compare their wealth and utility gains from today to those from yesterday.
+    If the new constraint resulted in less utility or the same utility and less wealth, the constraint is reverted to its previous value.
+
+    When there was not a new constraint on the previous day or the constraint was successful, the trader considers tightening the constraint.
+    If they gained wealth during the day, they are happy with the MRSs they are accepting, so they don't make any changes.
+    If they lost wealth, they determine whether they were a net buyer or seller of good 1.
+    If they were a net buyer, they decrease their buying constraint, which is the highest price they will pay to buy good 1.
+    If they were a net seller, they increase their selling constraint instead.
+    We will discuss the exact method of tightening in the evaluation section, when we compare different ones.
+
+  Multiple Days
+    At the end of each day, we calculate a few statistics about the day's trading. These are used to evaluate the performance of the model.
+
+    The global utility gain, is the percentage increase in utility over the day for all the traders. 
+    Because it is a percentage, it can be compared across different starting allocations and numbers of traders.
+    It is supposed to increase over time then converge as the traders learn constraints that help them maximize their utility gains.
+
+    The wealth transfer is the sum of the absolute value of wealths gained or lost, divided by the total amount of wealth at the beginning.
+    Like above, it is marked to the last price that any trader trades at.
+    This should approach 0 over time.
+    
+    As mentioned above, each trader has a most recent MRS they personally traded at.
+    In the ideal case, these all converge to the same value over the day, because if two traders disagree about MRS they can make a mutually beneficial trade.
+    To evaluate how close a simulation comes to this ideal, we calculate the standard deviation of the most recent MRS for each trader.
+    
+    We record the total number of attempted trades in the day.
+    We use this as our main method of comparing the running time of different models.
+    The elapsed clock time is also recorded, but this is less useful because it isn't comparable across machines.
+
+    Lastly, we calculate constrainedness based on the constraints used by each trader in the past day.
+    There are initial buy and sell constraints that every trader begins with.
+    This is the percentage of the original range between constraints that traders accept on average.
+    We actually use the log range, because the initial constraints vary by orders of magnitude and the plain range would underweight the lower (sell) constraint.
+    For example, constrainedness of 100% means that 100% of MRSs (within those initial constraints) are accepted.
+    Constrainedness of 5% means that only 5% of MRSs are acceptable on average.
+    We expect this to decrease over multiple rounds, and converge to a low value.
+
+    We track these statistics over many days of trading, and can analyze the results using a diagram like this.
+    This is a nice result, since all the stats do what we would expect.
+    We call this kind of outcome convergence.
+
+  Convergence
+    When evaluating models, we want to 
+

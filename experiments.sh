@@ -36,6 +36,9 @@ python3 walras.py -r 500 -n 100 -m 0.0001 -s 0 -v 1 -p 0 -t 100 --reversion rand
 echo cons_last_random
 python3 walras.py -r 500 -n 100 -m 0.0001 -s 0 -v 1 -p 0 -t 100 --reversion random -c last -e cons_last_random
 
-echo stable
-python3 walras.py -r 500 -n 100 -m 0.0001 -s 0 -v 1 -p 0 -t 100 --reversion mean -c mean -e stable --trader-file traders.txt
-
+# stability checks
+# echo stable_conv_simple
+# python3 walras.py -r 500 -n 100 -m 0.0001 -s 0 -v 1 -p 0 -t 100 --reversion mean -c mean -e stable --trader-file traders_conv.txt
+# echo stable_div_simple
+# python3 walras.py -r 500 -n 100 -m 0.0001 -s 0 -v 1 -p 0 -t 100 --reversion mean -c mean -e stable --trader-file traders_div.txt
+# echo stable_conv_backtrack
