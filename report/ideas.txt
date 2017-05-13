@@ -1,13 +1,22 @@
 todo
 ====
-  pick list of interesting experiments
+  pick list of interesting cases
     focus on death spirals and robustness to randomness
+    
+  analyze backtrack results, pick cases to focus on
 
   set up experiments
+      stability
+      dumb trades
+      number of traders
+      
+  pick new utility functions
 
   should constrainedness be flipped?
 
   TRADES multiplied by N
+  
+  Use averaged wealth for constraints with dumb trades?
 
 summary statistics 
 ==================
