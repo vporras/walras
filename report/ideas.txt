@@ -3,8 +3,6 @@ todo
   pick list of interesting cases
     focus on death spirals and robustness to randomness
     
-  analyze backtrack results, pick cases to focus on
-
   set up experiments
       stability
       dumb trades

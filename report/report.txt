@@ -4,6 +4,9 @@
 2869
 3266
 
+day
+3442
+
 Model
     This project focuses on simulating a world with two divisible goods that can be exchanged between a number of traders.
     Each trader in our world will receive a random initial "endowment" of goods, which they can trade with the others.
@@ -212,6 +215,18 @@ Experimentation
     They also have a utility drop threshold and a backtrack probability.
     At every day, they look backwards at their utility gains x days in the past for each x in their list of backtracks.
     If their utility gain has fallen below the threshold since that day in the past, they will reset their constraint to what it was on that day with backtrack probability.
+
+    We tested a variety of different backtracks, probabilities and thresholds on a smaller trial size so we could try more combinations.
+    For all of the backtrack tests, we used mean constraint choice and mean reversion.
+    The specific locations of the backtracks did not seem to have much effect; for instance, backtracking at 4 is quite similar to backtracking at 9. 
+    Because of that, we ended up picking the values of 5, 25 and 100 to represent small, medium, and large backtracks, and only testing those.
+    The results from those are in APPENDIX.
+    From them, we selected a subset to run full size trials.
+    A 99% threshold provided the highest quality results with no significant decrease in speed, so we use that level from here on.
+    We chose to run the full tests on probabilities of 50%, 75% and 100%, and backtracks of 5, 25, 5-25 and 5-25-100. 
+
+    Overall, backtracking is a big improvement over the naive constraint choice.
+    Even the worst performing backtrack model had ***% convergence and ***% divergence.
 
   Stability
     Stability is a desirable property for any random simulation of a event.
