@@ -6,16 +6,14 @@ import sys
 import os
 import json
 import multiprocessing as mp
+import warnings
 from time import time
 from enum import Enum
 from operator import itemgetter
 
-import warnings
 
 warnings.simplefilter("error")
 
-
-# TODO pick good defaults here
 BUY_CONSTRAINT = 10
 SELL_CONSTRAINT = 0.1
 DYNAMIC = True
@@ -325,7 +323,6 @@ def do_round(config, traders, round):
     du = [t.d_utility() for t in traders] / starting_u
     C = np.log(BUY_CONSTRAINT) - np.log(SELL_CONSTRAINT)
     c = [(np.log(t.buy_constraints[t.round]) - np.log(t.sell_constraints[t.round])) / C * 2 - 1 for t in traders]
-    # TODO: should this not include empty trades?
     res = (round, sum(np.abs(dw)) / 2, np.average(du), np.std(mrss), np.mean(c), total_trades/config.num_traders)
     if config.verbosity >= 3:
         print("%4d W: %.3f U: %.3f M: %.3f C: %.3f T: %2.2f" % res)
@@ -592,8 +589,8 @@ if __name__ == "__main__":
                         help="revert constraint if utility dropped since [BACKTRACK] (default: [])")
     parser.add_argument("--backtrack-prob", type=float, default=0.50,
                         help="backtrack with [PROBABILITY] if utility has fallen (default: 0.5)")
-    parser.add_argument("--backtrack-threshold", type=float, default=0.95,
-                        help="backtrack if utility has fallen below [THRESHOLD] * previous (default: 0.95)")
+    parser.add_argument("--backtrack-threshold", type=float, default=0.99,
+                        help="backtrack if utility has fallen below [THRESHOLD] * previous (default: 0.99)")
 
     # Summary args
     parser.add_argument("--div-bucket-size", type=int, default=10,

@@ -95,7 +95,7 @@ Implementation
     In the ideal case, these all converge to the same value over the day, because if two traders disagree about MRS they can make a mutually beneficial trade.
     To evaluate how close a simulation comes to this ideal, we calculate the standard deviation of the most recent MRS for each trader.
     
-    We record the total number of attempted trades in the day.
+    We record the average number of attempted trades per trader in the day.
     We use this as our main method of comparing the running time of different models.
     The elapsed clock time is also recorded, but this is less useful because it isn't comparable across machines.
 

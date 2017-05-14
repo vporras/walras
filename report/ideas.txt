@@ -14,8 +14,6 @@ todo
 
   should constrainedness be flipped?
 
-  TRADES multiplied by N
-  
   Use averaged wealth for constraints with dumb trades?
 
 summary statistics 
