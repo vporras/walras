@@ -7,11 +7,31 @@
 day
 3442
 3557
+3740
+
+Introduction
+    A competitive equilibrium is a set of prices and allocations for which 
+    We present an algorithm for finding near-CE solutions to the two-good, many trader case, in time linear with the number of traders.
+
+
+Background
+
+
+    There is a long history of trial-and-error techniques in this field.
+    Walras' original idea for finding equilibrium is called tatonnement, which means ???.
+    His approach was to have a centralised auctioneer pick a price, calculate the aggregate supply and demand, then adjust the price accordingly CITE.
+    However, Scarf shows that there were initial allocations could be chosen so as to be unstable under this procedure CITE.
+    Later research demonstrated that a modified tatonnement procedure could be found, but only if the auctioneer knowledge of all the traders' utility gradients.
+
+    Crockett, Spear and Sunder investigate the divisible goods case under a trading 
+
+    We investigate the multitrader case with only two goods, using randomised bilateral trade.
 
 Model
     This project focuses on simulating a world with two divisible goods that can be exchanged between a number of traders.
-    Each trader in our world will receive a random initial "endowment" of goods, which they can trade with the others.
-    An assignment of goods to traders is called an "allocation", and this will change throughout a "day" of trading.
+    An assignment of goods to traders is called an "allocation".
+    Each trader in our world will receive a random initial "endowment" allocation of goods, which they can trade with the others.
+    Thus, the allocation will change throughout a "day" of trading.
 
     The _marginal rate of substitution_ between our two goods will be used throughout to represent price.
     It applies to both actual and potential trades.
@@ -34,7 +54,6 @@ Model
     For the first part of the project, we use a special kind of utility function called Cobb-Douglass.
     This is x^p*y^(1-p) which is differentiable at all points to *** where x is good 1 and y is good 2.
 
-    
 
 
 Implementation
@@ -116,7 +135,7 @@ Implementation
     We call this kind of outcome convergence.
 
   Convergence
-    When designing models, we want to maximize the probabilty that they converges. 
+    When designing models, we want to maximize the probabilty that they converge.
     Convergence is a property of a trial of several days of trading.
     Intuitively, as model converges when it stops getting better.
     We define convergence as the point at which the average wealth transfer stops changing, with the caveat that the model does not meet the divergence criteria below.
@@ -135,7 +154,7 @@ Implementation
     The biggest challenge in executing this project was avoiding divergence or death spiral.
     A divergence is characterized by a decrease in utility and an increase in MRS deviation.
     FIGURE is a good example of one.
-    It is caused by the model becoming over constrained, which leads to a reduction in trading volume.
+    It is caused by the model becoming over-constrained, which leads to a reduction in trading volume.
     
     We discovered this phenomenom when we tried the simpler models of constraint choice.
     Every model would diverge in this manner on some trials, even after it had reached an acceptable state.
@@ -146,9 +165,8 @@ Implementation
     AND 2) MRS deviation is greater than 0.1 
     We use a moving average to smooth out condition 1.
     
-    To avoid convergence, we developed the technique of backtracking, which is discussed below.
-    
-    
+    To avoid divergence, we developed the technique of backtracking, which is discussed below.
+
   Testing
     Due to the wide parameter space and the length of time to construct experiments, we had to focus on analyzing some parameters, leaving others fixed.
     We tested on models of 100 traders, because they showed the same dynamics as larger models, but still could be tested in only a couple of minutes per trial.
@@ -156,10 +174,12 @@ Implementation
     
     We tested 100 trials of each model, using different random allocations for each trial.
     (Except for the stability experiments below)
-    However, we seeded the random number generator such that each model ran on the same set of allocations.
-    This means that any variations between models was not due to different starting allocations.
+    However, we seeded the random number generator such that each model ran on the same set of endowments.
+    This means that any variations between models was not due to different endowments.
+    Multiple trials are necessary because the results are highly dependent on those endowments, which matches the intuition that the point of the project is to simulate economies with different endowments.
     
     After the trials finished, the results were averaged to generate the summary statistics and the convergence/divergence rates.
+    For some models with 0% convergence, the quality of convergence metrics are obviously not available.
 
 
 Experimentation
@@ -240,10 +260,12 @@ Experimentation
     Stability is a desirable property for any random simulation of a event.
     If the results are very sensitive to the seed of the random number generator, it casts doubt on whether the results reflect the parameters well.
     In our case, we want to get the same results regardless of which pairs of traders are selected to trade.
-    To test this, we generated one set of starting allocations and ran many trials with different seeds on the same allocation.
+    To test this, we generated one set of starting allocations and ran many trials with different seeds on the same allocations.
     We tried this with mean-mean in both convergent and divergent cases, as well as with the 50%-5-25-100 backtracking model.
 
-    The results, in TABLE, back up
+    The results, in TABLE, show that the statistics are stable across different starting seeds.
+    The convergent allocations continued to converge 100% of the time, and the divergent allocation did so 100% of the time too.
+    It is encouraging that the best backtracking model remained stable, because that suggests that it could be safely used for simulating an allocation in practice.
 
   Relaxing the Differentiability Assumption
     The system as described relies on the gradient of the utility function to choose a direction and MRS for attempted trades.
@@ -272,13 +294,12 @@ Experimentation
     We also ran it with some other utility functions.
 
 
-  Comparison to Centralised Methods
+  Comparison to Other Methods
     The main advantage of the techniques in this project over the existing methods available is that the information requirements are much lower. 
     We do not assume that there is a central auctioneer who can query everyone's preferences at the same time.
     This would be unrealistic in many real world markets.
 
     We unfortunately do not have an easy way of comparing the efficiency of the two since we did not test the centralised methods on the same hardware, and our metric of attempted trades does not apply to a deterministic approach.
-    --> With oracle, there can be similar comparison
 
     We can say that our approach is linear in the number of traders. 
     This is supported experimentally by running experiments on different numbers of traders.
