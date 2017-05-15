@@ -366,7 +366,7 @@ class TrialSummary():
 
         wealth          = property(itemgetter(0))
         utility         = property(itemgetter(1))
-        mrs_deviation      = property(itemgetter(2))
+        mrs_deviation   = property(itemgetter(2))
         constrainedness = property(itemgetter(3))
         seconds         = property(itemgetter(4))
         trades          = property(itemgetter(5))
@@ -455,10 +455,10 @@ def do_trial(config, results):
         config.num_traders = len(traders)
     else:
         traders = random_traders(config.num_traders, config)
-
+        
     wealths         = np.empty([config.rounds])
     utilities       = np.empty([config.rounds])
-    mrs_deviation      = np.empty([config.rounds])
+    mrs_deviation   = np.empty([config.rounds])
     constrainedness = np.empty([config.rounds])
     seconds         = np.empty([config.rounds])
     trades          = np.empty([config.rounds])
