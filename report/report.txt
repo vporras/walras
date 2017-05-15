@@ -226,14 +226,18 @@ Experimentation
     We chose to run the full tests on probabilities of 50%, 75% and 100%, and backtracks of 5, 25, 5-25 and 5-25-100. 
 
     Overall, backtracking is a big improvement over the naive constraint choice.
-    Even the worst performing backtrack model had ***% convergence and ***% divergence.
+    The results are in TABLE.
+    Even the worst performing backtrack model had 83% convergence and 16% divergence.
+    The best model, with probability 50% and backtracks at 5, 25, and 100 had 100% convergence, with 34k average trades per trader until convergence.
+    Another model (just a single 25 backtrack) also had 100% convergence, but was slower, with 49k trades until convergence.
+    The 50%-5-25-100 model was only 29% slower than the mean-mean model without backtracks, but it had much higher rate of convergence, and lower wealth transfers.
 
   Stability
     Stability is a desirable property for any random simulation of a event.
     If the results are very sensitive to the seed of the random number generator, it casts doubt on whether the results reflect the parameters well.
     In our case, we want to get the same results regardless of which pairs of traders are selected to trade.
     To test this, we generated one set of starting allocations and ran many trials with different seeds on the same allocation.
-    We tried this with mean-mean in both convergent and divergent cases, as well as with the best backtracking model.
+    We tried this with mean-mean in both convergent and divergent cases, as well as with the 50%-5-25-100 backtracking model.
 
   Relaxing the Differentiability Assumption
     The system as described relies on the gradient of the utility function to choose a direction and MRS for attempted trades.
