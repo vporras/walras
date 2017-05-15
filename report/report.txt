@@ -6,6 +6,7 @@
 
 day
 3442
+3557
 
 Model
     This project focuses on simulating a world with two divisible goods that can be exchanged between a number of traders.
@@ -232,12 +233,17 @@ Experimentation
     Another model (just a single 25 backtrack) also had 100% convergence, but was slower, with 49k trades until convergence.
     The 50%-5-25-100 model was only 29% slower than the mean-mean model without backtracks, but it had much higher rate of convergence, and lower wealth transfers.
 
+    The high convergence percentage, with only 3.5% wealth transfers and tight MRS convergence, makes this version of the algorithm a feasible approximation of the centralised methods. 
+    Backtracking greatly reduces the risk of divergence, which was the main issue in getting a decentralized program to be useful.
+
   Stability
     Stability is a desirable property for any random simulation of a event.
     If the results are very sensitive to the seed of the random number generator, it casts doubt on whether the results reflect the parameters well.
     In our case, we want to get the same results regardless of which pairs of traders are selected to trade.
     To test this, we generated one set of starting allocations and ran many trials with different seeds on the same allocation.
     We tried this with mean-mean in both convergent and divergent cases, as well as with the 50%-5-25-100 backtracking model.
+
+    The results, in TABLE, back up
 
   Relaxing the Differentiability Assumption
     The system as described relies on the gradient of the utility function to choose a direction and MRS for attempted trades.
