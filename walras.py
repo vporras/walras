@@ -338,7 +338,6 @@ def do_round(config, traders, round):
     res = (round, sum(np.abs(dw)) / 2, np.average(du), np.std(mrss), np.mean(c), total_trades/config.num_traders)
     if config.verbosity >= 3:
         print("%4d W: %.3f U: %.3f M: %.3f C: %.3f T: %2.2f" % res)
-        print("%0.3f" % Trader.last_trade_mrs)
 
     is_last = round == config.rounds - 1
     if  config.verbosity == 4 and is_last:
@@ -350,7 +349,7 @@ def do_round(config, traders, round):
         print("du:  ", pretty(du))
 
     if config.plotting >= 2 and is_last or config.plotting >= 3:
-        plt.figure("allocations over time", figsize=(10, 12))
+        plt.figure("allocations (seed %d)" % config.seed, figsize=(8, 12))
 
         # only plot first 4 traders due to screen size
         n_to_plot = min(len(traders), 4)
@@ -508,8 +507,8 @@ def do_trial(config, results):
         plt.figure("seed %d" % config.seed, figsize=(10,8))
         plt.plot(wealths,         label="wealth transfers (%)")
         plt.plot(utilities,       label="utility gains (%)")
-        plt.plot(mrs_deviation,   label="mrs deviation (stddev)")
-        plt.plot(constrainedness, label="constrainedness %")
+        plt.plot(mrs_deviation,   label="mrs deviation")
+        plt.plot(constrainedness, label="constrainedness (%)")
 
     
         ax = plt.gca()

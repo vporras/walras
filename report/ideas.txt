@@ -1,5 +1,5 @@
-todo
-====
+todo before draft
+=================
   pick list of interesting cases
     focus on death spirals and robustness to randomness
     
@@ -7,6 +7,18 @@ todo
       stability
       dumb trades
       number of traders
+
+  check tenses
+  check tatatonnement
+  check centralized/ised
+  https://www.ece.ucdavis.edu/~jowens/commonerrors.html
+
+todo later
+==========
+  regenerate figures with latex
+  http://bkanuka.com/articles/native-latex-plots/
+  position on better pages
+
       
 questions
 =========
