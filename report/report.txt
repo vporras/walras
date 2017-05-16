@@ -13,14 +13,28 @@ day
 Title
   Approximating Walrasian Equilibria via Bilateral Trade
 
+Abstract
+  
+
 Introduction
-  The equilibrium conditions of markets have been widely studied in economics for hundreds of years.
-  We will consider a market with m traders and n goods, where each trader begins with an endowment of some goods.
-  A Walrasian equilibrium (WE) is a set of prices and allocations of goods that such that after every trader trades their endowment for their final allocation at those prices, they do not want to make any more trades.
-  We investigate finding an approximate WE using decentralised bilateral trade.
+  Brief outline of market & WE, why WE is important
+    The equilibrium conditions of markets have been widely studied in economics for hundreds of years.
+    We will consider a market with m traders and n goods, where each trader begins with an endowment of some goods.
+    A Walrasian equilibrium (WE) is a set of prices and allocations of goods that such that after every trader trades their endowment for their final allocation at those prices, they do not want to make any more trades.
+
+  Objectives
+
+  What did we do
+    We investigate finding an approximate WE using decentralised bilateral trade.
+
+  Death spirals
+
+  Results
 
   We present an algorithm for finding near-WE solutions to the two-good, many trader case, in time linear with the number of traders.
   Our main result is a novel approach to the practical issue of divergence when attempting to calculate a WE.
+
+  Structure of report
 
 
 Background
@@ -307,8 +321,16 @@ Experimentation
     This was necessary because the ratio of successful to empty trades is so much lower.
     These changes are appropriate because this algorithm is so much simpler and faster already that it still ran faster than the normal model after the modifications.
 
+    After testing on a variety of finish counts, we can conclude that
 
-Evaluation
+
+Conclusion
+
+  Achievements
+    This project is a step towards better calculation of Walrasian equilibria via bilateral trade.
+    We implemented a simulation framework that can test different models of constrained bilateral trade.
+    We addressed a significant issue with the constraint-learning method of calculation with the novel addition of backtracking.
+    
 
   Comparison to Other Methods
     The main advantage of the techniques in this project over the existing methods available is that the information requirements are much lower. 
@@ -335,3 +357,11 @@ Evaluation
 
     We would like to test our model against a wider variety of utility functions, since it theoretically has the capability to simulate them.
  
+References
+  Goldberg note
+  Arrow-Debreu
+  Scarf
+  Crockett
+  Cheung
+  Chen
+  Fleischer
