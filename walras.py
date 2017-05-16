@@ -45,6 +45,16 @@ class Trader():
         self.allocs = [endowment]
         self.alloc = endowment
         self.round = 0
+        
+        if config.utility_type == "normal":
+            self.utility = self.cd_utility
+            self.trade = self.grad_trade
+        elif config.utility_type == "leontief":
+            self.utility = self.leontief_utility
+            self.trade = self.nograd_trade
+        else:
+            self.utility = self.cd_utility
+            self.trade = self.nograd_trade
 
         # these lists store histories of constraints by round
         self.buy_constraints  = [BUY_CONSTRAINT]
@@ -134,12 +144,17 @@ class Trader():
         self.pick_constraint(self.buy_constraints, self.buy_lookbacks, Dir.buy, net_buyer)
         self.pick_constraint(self.sell_constraints, self.sell_lookbacks, Dir.sell, net_buyer)
         
-    def utility(self, alloc):
+    def cd_utility(self, alloc):
         alpha = self.preference
         x1, x2 = alloc
         if x1 < 0 or x2 < 0:
             return 0
         return x1**alpha * x2**(1-alpha)
+        
+    def leontief_utility(self, alloc):
+        alpha = self.preference
+        x1, x2 = alloc
+        return min(x1, x2/alpha)
 
     def d_utility(self):
         return self.utility(self.alloc) - self.utility(self.endowment)
@@ -222,7 +237,7 @@ class Trader():
         self.allocs.append(self.alloc)
 
     
-    def trade(self, other, min_size):
+    def grad_trade(self, other, min_size):
         dir = self.get_dir(other) 
         joint_mrs = self.joint_mrs(other, dir)
         size = self.get_size(other, dir, joint_mrs, min_size)
@@ -236,8 +251,8 @@ class Trader():
             
         return size
 
-    # No access to derivative, so can't guess direction
-    def dumb_trade(self, other, min_size):
+    # No access to gradient, so can't guess direction
+    def nograd_trade(self, other, min_size):
         dir = Dir.buy
         # Pick a random price
         # TODO: truncated normal?
@@ -289,12 +304,9 @@ class Trader():
             preference = self.preference,
             alloc = self.alloc))
 
-def trade_random(traders, min_size, utility_only):
+def trade_random(traders, min_size):
     a,b = random.sample(traders,2)
-    if utility_only:
-        return(a.dumb_trade(b, min_size))
-    else:
-        return(a.trade(b, min_size))
+    return(a.trade(b, min_size))
 
 def do_round(config, traders, round):
     # wait for until the last [finish_count * num_traders] trades have been 0-size
@@ -302,7 +314,7 @@ def do_round(config, traders, round):
     total_trades = 0
     zero_trades = 0
     while consecutive_zero_trades < config.finish_count * config.num_traders:
-        size = trade_random(traders, config.min_size, config.utility_only)
+        size = trade_random(traders, config.min_size)
         total_trades += 1
         if size == 0:
             consecutive_zero_trades += 1
@@ -326,6 +338,7 @@ def do_round(config, traders, round):
     res = (round, sum(np.abs(dw)) / 2, np.average(du), np.std(mrss), np.mean(c), total_trades/config.num_traders)
     if config.verbosity >= 3:
         print("%4d W: %.3f U: %.3f M: %.3f C: %.3f T: %2.2f" % res)
+        print("%0.3f" % Trader.last_trade_mrs)
 
     is_last = round == config.rounds - 1
     if  config.verbosity == 4 and is_last:
@@ -573,7 +586,9 @@ if __name__ == "__main__":
     # parser.add_argument("-d", "--dynamic", action="store_true", help="dynamic size (binary search)")
     parser.add_argument("--finish-count", type=float, default=1.0,
                         help="number of empty trades per trader to finish a round (default: 1.0)")
-    parser.add_argument("-u", "--utility-only", action="store_true", help="don't use derivatives of utility function")
+    parser.add_argument("-u", "--utility-type", choices=["normal", "nogradient", "leontief"], default="normal",
+                        help="utility functions, where normal is Cobb-Douglas with access to the gradient" \
+                        "nogradient is Cobb-Douglas without gradients, leontief is Leontief")
 
     # Constraint args
     parser.add_argument("-c", "--constraint-mode", choices=["last", "mean", "fixed"], default="mean",

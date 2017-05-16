@@ -8,13 +8,23 @@ day
 3442
 3557
 3740
+4025
+
+Title
+  Approximating Walrasian Equilibria via Bilateral Trade
 
 Introduction
-    A competitive equilibrium is a set of prices and allocations for which 
-    We present an algorithm for finding near-CE solutions to the two-good, many trader case, in time linear with the number of traders.
+  The equilibrium conditions of markets have been widely studied in economics for hundreds of years.
+  We will consider a market with m traders and n goods, where each trader begins with an endowment of some goods.
+  A Walrasian equilibrium (WE) is a set of prices and allocations of goods that such that after every trader trades their endowment for their final allocation at those prices, they do not want to make any more trades.
+  We investigate finding an approximate WE using decentralised bilateral trade.
+
+  We present an algorithm for finding near-WE solutions to the two-good, many trader case, in time linear with the number of traders.
+  Our main result is a novel approach to the practical issue of divergence when attempting to calculate a WE.
 
 
 Background
+
 
 
     There is a long history of trial-and-error techniques in this field.
@@ -23,7 +33,14 @@ Background
     However, Scarf shows that there were initial allocations could be chosen so as to be unstable under this procedure CITE.
     Later research demonstrated that a modified tatonnement procedure could be found, but only if the auctioneer knowledge of all the traders' utility gradients.
 
-    Crockett, Spear and Sunder investigate the divisible goods case under a trading 
+    Crockett, Spear and Sunder investigate using trading to solve the divisible goods case.
+    They pioneer the use of constraints learned by traders to reach a WE and prove convergence guarantees for the two-trader case.
+    Unfortunately, they also show that there are cases where bilateral trade cannot find an exact equilibrium in the multitrader case.
+
+    Fleischer gives performance guarantees using an aggregate demand oracle to find approximate WE CITE.
+
+    Based off the suggestions in CITE(Goldberg), we implemented the idea of bilateral trade with constraints discussed in CITE(crokett).
+    
 
     We investigate the multitrader case with only two goods, using randomised bilateral trade.
 
@@ -283,16 +300,15 @@ Experimentation
 
     We tested this with the mean-mean constraint model.
     To get it to work, we had to adjust a few parameters. 
-    First, we changed the finish count from 1 to 5.
+    First, we changed the minimum trade size from 0.0001 to 0.0000001 
+    Note that since the sizes expand geometrically as long as they are plus-utility, this is only log2 1000 more steps per trade, rather than 1000.
+    We also increased the finish count from 1 to numbers between 5 and 30.
     This meant that the model would wait for more empty trades before finishing a day.
     This was necessary because the ratio of successful to empty trades is so much lower.
-    Also, we ran these simulations for more days to get it to converge.
-    These changes are appropriate because this algorithm is so much simpler and faster already that it still ran faster than the normal model after the modifications
+    These changes are appropriate because this algorithm is so much simpler and faster already that it still ran faster than the normal model after the modifications.
 
-    The results 
 
-    We also ran it with some other utility functions.
-
+Evaluation
 
   Comparison to Other Methods
     The main advantage of the techniques in this project over the existing methods available is that the information requirements are much lower. 
@@ -316,4 +332,6 @@ Experimentation
     We only focused on the very simple case of two goods.
     Every centralised model supports more goods, which is more realistic.
     We believe this could be expanded to more goods, but it would take a substantial change to the code and was such outside the scope of the project.
+
+    We would like to test our model against a wider variety of utility functions, since it theoretically has the capability to simulate them.
  
