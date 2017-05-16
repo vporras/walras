@@ -58,7 +58,8 @@ Background
 
     We investigate the multitrader case with only two goods, using randomised bilateral trade.
 
-Model
+Design and Implementation
+  Model
     This project focuses on simulating a world with two divisible goods that can be exchanged between a number of traders.
     An assignment of goods to traders is called an "allocation".
     Each trader in our world will receive a random initial "endowment" allocation of goods, which they can trade with the others.
@@ -87,7 +88,6 @@ Model
 
 
 
-Implementation
 
   Single Day
 
