@@ -1,4 +1,3 @@
-
 %%% Local Variables:
 %%% mode: latex
 %%% TeX-master: t
@@ -10,6 +9,7 @@
 \usepackage{enumitem}
 \usepackage{amssymb}
 \usepackage[utf8]{inputenc}
+\usepackage{rotating}
 
 \graphicspath{ {images/} }
 \bibliography{report.bib}
@@ -59,10 +59,15 @@ Professor Paul Goldberg % Supervisor's Name
 \end{abstract}
 
 \section{Introduction}
-TODO: Brief outline of market and WE, why WE is important
-
 The equilibrium conditions of markets have been widely studied in economics for hundreds of years.
+
+TODO: explain why WE is important
+
+TODO: rephrase this
 In economics, a market is said to be in Walrasian equilibrium (WE) when no market participants can make any more profitable trades, and none of them subsidized each other. 
+
+TODO: make this more mathematical
+
 We will consider a market with m traders and n goods, where each trader begins with an endowment of some goods.
 A Walrasian equilibrium (WE) is a set of prices and allocations of goods such that after every trader trades their endowment for their final allocation at those prices, they do not want to make any more trades.
 
@@ -131,6 +136,8 @@ This is a function which takes a \textit{seed} and produces a sequence of seemin
 The crucial part is that the same seed will always produce the same sequence.
 For other programs, the current time is often used as a seed so the sequence is not repeated.
 However for our purposes, we will use specific seeds to get reproducible results and still reap the benefits of a randomized algorithm.
+
+TODO: paragraph on our algorithm and subsidisers
 
 There is a long history of trial-and-error techniques in this field.
 Walras' original idea for finding equilibrium is called tâtonnement, which means trial-and-error in French.
@@ -215,7 +222,7 @@ They achieve this by updating the constraints on the MRSs they will accept for b
 Using the definition of wealth from above, and the last MRS used globally, each trader calculates the wealth they gained or lost during the day.
 
 Recall that no traders will accept trades that cause them to lose utility. 
-Thus, we can calculate the non-negative utility gain by subtracting the utility of the initial endowment from the utility of the final allocation after a day's worth of trades.
+Thus, they will have a non-negative utility gain, which we can calculate by subtracting the utility of the initial endowment from the utility of the final allocation after a day's worth of trades.
 
 First, if the trader updated their constraint from the previous day, they compare their wealth and utility gains from today to those from yesterday.
 If the new constraint resulted in less utility or the same utility and less wealth, the constraint is reverted to its previous value.
@@ -227,28 +234,28 @@ When there was not a new constraint on the previous day or the constraint was su
   \item If they were a net buyer, they decrease their buying constraint, which is the highest price they will pay to buy good 1.
   \item If they were a net seller, they increase their selling constraint instead.
 \end{itemize}
-We will discuss the exact method of tightening in the evaluation section, when we compare different ones.
+We will discuss the exact method of tightening in Section \ref{results}, when we compare different techniques.
 
 \subsection{Statistics}
-At the end of each day, we calculate five statistics about the day's trading: These are used to evaluate the performance of the model.
+At the end of each day, we calculate five statistics about the day's trading: utility gain, wealth transfer, MRS deviation, constrainedness, and attempted trades.
+These are used to evaluate the performance of the model.
 
 The global utility gain, is the percentage increase in utility over the day for all the traders. 
 Because it is a percentage, it can be compared across different starting allocations and numbers of traders.
-It is supposed to increase over time then converge as the traders learn constraints that help them maximize their utility gains.
+It increases initially then settles as the traders learn constraints that help them maximize their utility gains.
+It can decrease if the traders become over-constrained.
 
 The wealth transfer is the sum of the absolute value of wealths gained or lost, divided by the total amount of wealth at the beginning.
-Like above, it is marked to the last price that any trader trades at.
-This should approach 0 over time.
+Like above, it is marked to the used for the final successful trade.
+This should approach 0 as subsiders apply constraints to prevent themselves from losing wealth.
 
 As mentioned above, each trader has a most recent MRS they personally traded at.
 In the ideal case, these all converge to the same value over the day, because if two traders disagree about MRS they can make a mutually beneficial trade.
 To evaluate how close a simulation comes to this ideal, we calculate the standard deviation of the most recent MRS for each trader.
-    
-We record the average number of attempted trades per trader in the day.
-We use this as our main method of comparing the running time of different models.
-The elapsed clock time is also recorded, but this is less useful because it isn't comparable across machines.
 
-Lastly, we calculate constrainedness based on the constraints used by each trader in the past day.
+TODO: use diagram to explain this
+    
+We calculate constrainedness based on the constraints used by each trader in the past day.
 There are initial buy and sell constraints that every trader begins with.
 This is the percentage of the original range between constraints that traders accept on average.
 We actually use the log range, because the initial constraints vary by orders of magnitude and the plain range would underweight the lower (sell) constraint.
@@ -256,25 +263,51 @@ For example, constrainedness of 100\% means that 100\% of MRSs (within those ini
 Constrainedness of 5\% means that only 5\% of MRSs are acceptable on average.
 We expect this to decrease over multiple days, and converge to a low value.
 
-We track these statistics over many days of trading, and can analyze the results using a diagram like this.
-This is a nice result, since all the stats do what we would expect.
-We call this kind of outcome convergence.
+Lastly, we record the average number of attempted trades per trader in the day.
+We use this as our main method of comparing the running time of different models.
+The elapsed clock time is also recorded, but this is less useful because it isn't comparable across machines.
+
+
+We track these statistics over many days of trading, and use them to analyze the results.
+They are displayed in charts like that in Figure \ref{fig:conv}.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{seed_5.png}
+    \caption{
+      Convergence with mean constraint with mean reversion, for 100 traders.
+      Notice how all the statistics stabilize, and MRS deviation is small.
+    }
+    \label{fig:conv}
+\end{figure}
 
 \subsection{Convergence}
-When designing models, we want to maximize the probabilty that they converge.
+TODO: distinguish between convergence point and property
+
+When designing models, we want to maximize the probabilty that they converge to a stable set of MRSs that maximise utility.
 Convergence is a property of a trial of several days of trading.
 Intuitively, as model converges when it stops getting better.
 We define convergence as the point at which the average wealth transfer stops changing, with the caveat that the model does not meet the divergence criteria below.
 More concretely, given a trial that has not diverged, the convergence point is the earliest day where the wealth transfer for all following days is within a threshold.
 Experimentally, we have found that a threshold of 1\% seems to capture the examples that match the intuition above.
 
-We defined convergence on wealth, not utility, because the utility was noiser and less like a monotone function.
+We defined convergence on wealth, not utility, because the utility was noiser and less like a monotonic function.
 Also, since the goal of this project is to approximate the output of an exact centralized system, we are trying to minimize wealth transfers.
 It is possible that the ideal equilibrium actually has lower utility than the simulation, but the ideal wealth transferred is always zero.
 
 For each model, we record the percentage of trials that converged, as well as the average wealth transfer, utility gain, MRS deviation, and constrainedness at that point.
 We also record those same statistics at the end of the trial, though they are typically very similar.
 The advantage of recording them at the end is that they can be compared across convergent and divergent cases.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{seed_0.png}
+    \caption{
+      Divergence with mean constraint with mean reversion, for 100 traders.
+      Notice how utility falls around day 100 and MRS deviation increases dramatically.
+    }
+    \label{fig:div}
+\end{figure}
 
 \subsection{Divergence}
 The biggest challenge in executing this project was avoiding divergence or death spiral.
@@ -286,25 +319,14 @@ We discovered this phenomenom when we tried the simpler models of constraint cho
 Every model would diverge in this manner on some trials, even after it had reached an acceptable state.
 We wanted to avoid this in potential models, so we developed a criteria for identifying them automatically.
 
-Formally, a trial is said to diverge if:
+Specifically, we say a trial diverges on day $d$ if:
 \begin{description}[align=right,labelwidth=2cm,font=\normalfont]
-\item[1.] Utility gains fall at least 5\% from the first day 
-\item[AND 2.] MRS deviation is greater than 0.1 
+\item[1.] Utility gains fall at least 5\% from the first day to $d$ 
+\item[AND 2.] MRS deviation is greater than 0.1 on day $d$
 \end{description}
 We use a moving average to smooth out condition 1.
     
-To avoid divergence, we developed the technique of backtracking, which is discussed below.
-TODO: expand here
-
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=\textwidth]{seed_0.png}
-    \caption{
-      Mean constraint with mean reversion, for 100 traders.
-      Notice how utility falls around day 100 and MRS deviation increases dramatically.
-    }
-    \label{fig:div}
-\end{figure}
+To avoid divergence, we developed the technique of backtracking, which is discussed in Section \ref{backtrack}.
 
 \subsection{Testing}
 Due to the wide parameter space and the length of time to construct experiments, we had to focus on analyzing some parameters, leaving others fixed.
@@ -346,7 +368,7 @@ When combined with mean choice, it is equivalent to binary search over constrain
 Random reversion means that the trader reverts to a random MRS between the current constraint and the old constraint.
 
 We tested all 15 combinations of constraint choice and reversion.
-The full results are listed in TABLE.
+The full results are listed in Table \ref{tab:simple}.
 The results were not particularly encouraging, with 77\% of trials diverging and only 15\% converging across the board.
 Mean constraint choice was by far the most effective, with 63\% converging.
 Mean choice with random reversion had 96\% convergence and only 1\% divergence.
@@ -356,9 +378,36 @@ Total reversion was slower and less convergent than mean-mean.
 All three had similar MRS divergence and utility gains at convergence.
 Mean-random came out on top with only 3.7\% wealth transfers, a little ahead of mean-mean with 4.5\%.
 
-Based on these results, we decided to focus on improving versions of the algorithm with mean constraint choice.
+Based on these results, we decided to focus on improving versions of the algorithm with mean constraint choice and mean reversion.
 
-\subsection{Backtracking}
+
+\begin{sidewaystable}
+  \begin{tabular}{ll|rr|rrrr|rrrr}
+    &  & \multicolumn{1}{|l}{} & \multicolumn{1}{l|}{} & \multicolumn{ 4}{c|}{At Convergence} & \multicolumn{ 4}{c}{After 500 Days} \\
+    Constraint & Reversion & \multicolumn{1}{l}{Div.} & \multicolumn{1}{l|}{Conv.} & \multicolumn{1}{l}{Wealth} & \multicolumn{1}{l}{Utility} & \multicolumn{1}{l}{MRS Dev.} & \multicolumn{1}{l|}{Trades} & \multicolumn{1}{l}{Wealth} & \multicolumn{1}{l}{Utility} & \multicolumn{1}{l}{MRS Dev.} & \multicolumn{1}{l}{Trades} \\ 
+    \hline
+    \multicolumn{ 1}{l}{Fixed 5\%} & Mean & 100\% & 0\% &  &  &  &  & 0.021 & 0.077 & 0.493 & 32,548 \\
+    \multicolumn{ 1}{l}{} & Random & 0\% & 5\% & 0.114 & 0.300 & 0.047 & 27,365 & 0.095 & 0.303 & 0.028 & 29,630 \\
+    \multicolumn{ 1}{l}{} & Total & 100\% & 0\% &  &  &  &  & 0.001 & 0.028 & 0.065 & 24,088 \\
+    \multicolumn{ 1}{l}{Fixed 10\%} & Mean & 100\% & 0\% &  &  &  &  & 0.017 & 0.047 & 0.444 & 20,224 \\
+    \multicolumn{ 1}{l}{} & Random & 52\% & 22\% & 0.080 & 0.282 & 0.193 & 42,946 & 0.073 & 0.260 & 0.300 & 48,250 \\
+    \multicolumn{ 1}{l}{} & Total & 100\% & 0\% &  &  &  &  & 0.001 & 0.022 & 0.051 & 13,125 \\
+    \multicolumn{ 1}{l}{Fixed 20\%} & Mean & 100\% & 0\% &  &  &  &  & 0.015 & 0.036 & 0.411 & 12,991 \\
+    \multicolumn{ 1}{l}{} & Random & 99\% & 0\% &  &  &  &  & 0.031 & 0.125 & 0.317 & 32,644 \\
+    \multicolumn{ 1}{l}{} & Total & 100\% & 0\% &  &  &  &  & 0.006 & 0.097 & 0.124 & 12,447 \\
+    \multicolumn{ 1}{l}{Last MRS} & Mean & 100\% & 0\% &  &  & &  & 0.003 & 0.019 & 0.083 & 13,453 \\
+    \multicolumn{ 1}{l}{} & Random & 100\% & 0\% &  &  &  &  & 0.013 & 0.096 & 0.139 & 20,900 \\
+    \multicolumn{ 1}{l}{} & Total & 100\% & 0\% &  &  &  &  & 0.000 & 0.005 & 0.035 & 6,166 \\
+    \multicolumn{ 1}{l}{Mean} & \textbf{Mean} & \textbf{48\%} & \textbf{52\%} & \textbf{0.045} & \textbf{0.325} & \textbf{0.008} & \textbf{26,224} & \textbf{0.025} & \textbf{0.216} & \textbf{0.052} & \textbf{61,990} \\
+    \multicolumn{ 1}{l}{} & \textbf{Random} & \textbf{1\%} & \textbf{96\%} & \textbf{0.037} & \textbf{0.325} & \textbf{0.008} & \textbf{63,521} & \textbf{0.036} & \textbf{0.326} & \textbf{0.009} & \textbf{77,839} \\
+    \multicolumn{ 1}{l}{} & Total & 57\% & 42\% & 0.045 & 0.325 & 0.008 & 29,255 & 0.021 & 0.192 & 0.044 & 59,538 \\
+  \end{tabular}
+\caption{Results for simple constraint choice and reversion}
+\label{tab:simple}
+\end{sidewaystable}
+
+
+\subsection{Backtracking}\label{backtrack}
 
 The main novel idea in this paper is the application of backtracking to this problem.
 Backtracking means looking at past constraints, and if they gave better utility, switching to them with some positive probability.
@@ -370,14 +419,14 @@ It is also possible that the constraint might be good in the absence of other tr
 Thus, it sometimes might be the case that a constraint needs to be relaxed quite a bit to find the optimal solution.
 
 To implement backtracking, each trader keeps track of their past utilities and constraint values.
-They have a list of integers, called the "backtracks", which are relative indices used for comparison.
+They have a list of integers, the \textit{backtrack positions}, which are relative indices used for comparison.
 They also have a utility drop threshold and a backtrack probability.
-At every day, they look backwards at their utility gains x days in the past for each x in their list of backtracks.
+At every day, they look backwards at their utility gains $x$ days in the past for each backtrack position $x$.
 If their utility gain has fallen below the threshold since that day in the past, they will reset their constraint to what it was on that day with backtrack probability.
 
-We tested a variety of different backtracks, probabilities and thresholds on a smaller trial size so we could try more combinations.
+We tested a variety of different backtrack positions, probabilities and thresholds on a small trial size so we could explore a wider parameter space.
 For all of the backtrack tests, we used mean constraint choice and mean reversion.
-The specific locations of the backtracks did not seem to have much effect; for instance, backtracking at 4 is quite similar to backtracking at 9. 
+The specific backtrack positions did not seem to have much effect; for instance, backtracking at 4 is quite similar to backtracking at 9. 
 Because of that, we ended up picking the values of 5, 25 and 100 to represent small, medium, and large backtracks, and only testing those.
 The results from those are in APPENDIX.
 From them, we selected a subset to run full size trials.
@@ -385,7 +434,7 @@ A 99\% threshold provided the highest quality results with no significant decrea
 We chose to run the full tests on probabilities of 50\%, 75\% and 100\%, and backtracks of 5, 25, 5-25 and 5-25-100. 
 
 Overall, backtracking is a big improvement over the naive constraint choice.
-The results are in TABLE.
+The results can be found in Table ref{tab:bt2}.
 Even the worst performing backtrack model had 83\% convergence and 16\% divergence.
 The best model, with probability 50\% and backtracks at 5, 25, and 100 had 100\% convergence, with 34k average trades per trader until convergence.
 Another model (just a single 25 backtrack) also had 100\% convergence, but was slower, with 49k trades until convergence.
@@ -394,12 +443,39 @@ The 50\%-5-25-100 model was only 29\% slower than the mean-mean model without ba
 The high convergence percentage, with only 3.5\% wealth transfers and tight MRS convergence, makes this version of the algorithm a feasible approximation of the centralized methods. 
 Backtracking greatly reduces the risk of divergence, which was the main issue in getting a decentralized program to be useful.
 
+\begin{sidewaystable}
+  \begin{tabular}{rl|rr|rrrr|rrrr}
+
+    \multicolumn{1}{l}{} &  & \multicolumn{1}{l}{} & \multicolumn{1}{l}{} & \multicolumn{ 4}{|c|}{At Convergence} & \multicolumn{ 4}{c}{After 500 Days} \\ 
+    \multicolumn{1}{l}{Prob.} & Positions & \multicolumn{1}{l}{Div.} & \multicolumn{1}{l|}{Conv.} & \multicolumn{1}{l}{Wealth} & \multicolumn{1}{l}{Utility} & \multicolumn{1}{l}{MRS Dev.} & \multicolumn{1}{l|}{Trades} & \multicolumn{1}{l}{Wealth} & \multicolumn{1}{l}{Utility} & \multicolumn{1}{l}{MRS Dev.} & \multicolumn{1}{l}{Trades} \\ 
+    \hline
+    \multicolumn{ 1}{r}{100\%} & 5 & 0\% & 99\% & 0.031 & 0.328 & 0.006 & 49,237 & 0.029 & 0.326 & 0.008 & 89,784 \\ 
+    \multicolumn{ 1}{r}{} & 25 & 0\% & 98\% & 0.033 & 0.329 & 0.005 & 52,396 & 0.032 & 0.328 & 0.006 & 92,192 \\ 
+    \multicolumn{ 1}{r}{} & 5-25 & 0\% & 98\% & 0.031 & 0.329 & 0.004 & 38,070 & 0.029 & 0.328 & 0.006 & 92,742 \\ 
+    \multicolumn{ 1}{r}{} & 5-25-100 & 0\% & 99\% & 0.031 & 0.330 & 0.005 & 37,646 & 0.029 & 0.329 & 0.005 & 89,141 \\ 
+    \multicolumn{ 1}{r}{50\%} & 5 & 16\% & 83\% & 0.035 & 0.324 & 0.007 & 31,801 & 0.029 & 0.310 & 0.014 & 79,027 \\ 
+    \multicolumn{ 1}{r}{} & 25 & \textbf{0\%} & \textbf{100\%} & \textbf{0.033} & \textbf{0.326} & \textbf{0.007} & \textbf{49,327} & \textbf{0.030} & \textbf{0.326} & \textbf{0.008} & \textbf{87,959} \\ 
+    \multicolumn{ 1}{r}{} & 5-25 & 0\% & 98\% & 0.034 & 0.330 & 0.007 & 31,508 & 0.033 & 0.327 & 0.007 & 90,156 \\ 
+    \multicolumn{ 1}{r}{} & 5-25-100 & \textbf{0\%} & \textbf{100\%} & \textbf{0.035} & \textbf{0.330} & \textbf{0.005} & \textbf{33,805} & \textbf{0.033} & \textbf{0.329} & \textbf{0.006} & \textbf{92,732} \\ 
+    \multicolumn{ 1}{l}{75\%} & 5 & 0\% & 97\% & 0.032 & 0.325 & 0.006 & 37,764 & 0.029 & 0.322 & 0.009 & 84,737 \\ 
+    \multicolumn{ 1}{r}{} & 25 & 0\% & 99\% & 0.035 & 0.328 & 0.009 & 43,043 & 0.033 & 0.328 & 0.006 & 91,659 \\ 
+    \multicolumn{ 1}{l}{} & 5-25 & 0\% & 97\% & 0.032 & 0.330 & 0.005 & 32,221 & 0.032 & 0.328 & 0.006 & 92,156 \\ 
+    \multicolumn{ 1}{l}{} & 5-25-100 & 0\% & 99\% & 0.033 & 0.330 & 0.004 & 36,274 & 0.031 & 0.329 & 0.006 & 91,333 \\ 
+  \end{tabular}
+  \caption{Results for simple constraint choice and reversion}
+  \label{tab:bt2}
+\end{sidewaystable}
+
+
 \subsection{Stability}
 Stability is a desirable property for any random simulation of a event.
-If the results are very sensitive to the seed of the random number generator, it casts doubt on whether the results reflect the parameters well.
-In our case, we want to get the same results regardless of which pairs of traders are selected to trade.
-To test this, we generated one set of starting allocations and ran many trials with different seeds on the same allocations.
+If the results are very sensitive to the source of randomness, it casts doubt on whether the results reflect the parameters well.
+Above, we use (pseudo)randomness both to assign the endowment allocations for testing and to run the trading and learning process.
+In our case, we want the outcome to be sensitive to the endowments, but not the random pairs chosen to trade or the random backtracks that occur. 
+To test this, we generated one set of endowments and ran many trials with different seeds on the same endowments.
 We tried this with mean-mean in both convergent and divergent cases, as well as with the 50\%-5-25-100 backtracking model.
+
+TODO: rerun this with standard deviations
 
 The results, in TABLE, show that the statistics are stable across different starting seeds.
 The convergent allocations continued to converge 100\% of the time, and the divergent allocation did so 100\% of the time too.
@@ -417,10 +493,10 @@ By giving up on differentiability, the model becomes closer to the real world, w
 Additionally, it makes it possible to use a wider variety of utility functions, especially piecewise linear ones which are important in the literature \cite{chen}.
 There is even the possibility of using non-deterministic utility functions, where the utility function samples a probability distribution.
 This would work fine with the relaxed model as long as the queries were deterministic within individual trades.
-(eg if the oracle says a trade is plus-utility, and so it is accepted, then it must lead to a gain in utility, even if the same terms are rejected on another day) 
+For example, if the oracle says a trade is plus-utility, and so it is accepted, then it must lead to a gain in utility, even if the same terms are rejected on another day.
 
-We tested this with the mean-mean constraint model.
-To get it to work, we had to adjust a few parameters. 
+We tested this lower-information model with the mean-mean constraint model.
+We tuned two parameters differently to maximize performance. 
 First, we changed the minimum trade size from 0.0001 to 0.0000001 
 Note that since the sizes expand geometrically as long as they are plus-utility, this is only $\log_2 1000$ more steps per trade, rather than 1000.
 We also increased the finish count from 1 to numbers between 5 and 30.
@@ -437,6 +513,7 @@ TODO: this
 This project is a step towards better calculation of Walrasian equilibria via bilateral trade.
 We implemented a simulation framework that can test different models of constrained bilateral trade.
 We addressed a significant issue with the constraint-learning method of calculation with the novel addition of backtracking.
+TODO: expand
 
 
 \subsection{Evaluation}

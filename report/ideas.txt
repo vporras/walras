@@ -18,12 +18,14 @@ todo later
   regenerate figures with latex
   http://bkanuka.com/articles/native-latex-plots/
   position on better pages
+  appendices
 
       
 questions
 =========
   should constrainedness be flipped?
   the word "model"
+  are the table names clear enough?
 
 
 time metrics
