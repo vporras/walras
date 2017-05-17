@@ -3,15 +3,14 @@ todo before draft
   pick list of interesting cases
     focus on death spirals and robustness to randomness
     
-  set up experiments
-      stability
-      dumb trades
-      number of traders
+  finish results for multiple utility
 
+  inline todos
+
+  comment out remaining todos
   check tenses
-  check tatatonnement
-  check centralized/ised
   https://www.ece.ucdavis.edu/~jowens/commonerrors.html
+
 
 todo later
 ==========
@@ -25,7 +24,11 @@ questions
 =========
   should constrainedness be flipped?
   the word "model"
-  are the table names clear enough?
+    -- what do I call a set of parameters? experimental setup?
+  are the table column names clear enough?
+  can I say backtracking is novel?
+  he/her/they for traders
+
 
 
 time metrics
