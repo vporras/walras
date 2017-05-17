@@ -1,5 +1,5 @@
-todo
-====
+todo before draft
+=================
   pick list of interesting cases
     focus on death spirals and robustness to randomness
     
@@ -7,29 +7,24 @@ todo
       stability
       dumb trades
       number of traders
+
+  check tenses
+  check tatatonnement
+  check centralized/ised
+  https://www.ece.ucdavis.edu/~jowens/commonerrors.html
+
+todo later
+==========
+  regenerate figures with latex
+  http://bkanuka.com/articles/native-latex-plots/
+  position on better pages
+
       
-  pick new utility functions
-
+questions
+=========
   should constrainedness be flipped?
+  the word "model"
 
-  Use averaged wealth for constraints with dumb trades?
-
-summary statistics 
-==================
-  % that converged
-  % that diverged
-  at [convergence/end]
-    wealth
-    time (time/round)
-    utility
-    mrs deviation
-    constrainedness
-
-  distance from centralised deterministic system
-    utility? (might be lower in central!)
-    mrs distance
-
-  use Stats when printing daily data
 
 time metrics
 ============
@@ -40,18 +35,6 @@ time metrics
   non-zero trades
   calls to oracles (sensitive to dynamic sizing)
      maybe use later
-
-convergence criteria
-====================
-  first point after which all wealths are within 1% of end
-  disallows divergence
-  
-  
-divergence criteria
-===================
-  utility drops more than 5% from start
-  mrs is high
-
 
 motivation
 ==========
@@ -67,97 +50,7 @@ information we have access to
     needs differentiability
   without differentiability
     can used stochastic utility functions
-    
 
-what happens in an individual day
-=================================
-  loop:
-    pick 2 traders
-    figure which dir they want to trade (needs diff)
-    calculate joint mrs / price to trade at
-      this could be done with individual mrs or with constraints
-    choose size
-      fixed: medium size
-      dynamic: largest plus-u size
-
-    change allocations if plus-u
-
-  stopping conditions
-    wait until x empty trades
-    could use variation in public last mrs
-    could have fixed numbers
-    wait until X% of recent trades are empty
-    could check every trader?
-    choice of finish count?
-      scaled per trader
-      seems like high finish count can avoid the need for backtracking
-      very important for dumb trades
-
-across rounds
-=============
-  tighten constraints if
-    lost wealth (privately estimated)
-
-  each metric used
-    wealths (publicly calculated from truth)
-    utilities
-    mrs convergences
-    constrainedness
-      theoretical maximum
-
-  stopping conditions
-    access to global information?
-
-  death spirals
-    what characterizes death spiral
-      mrsc goes way up
-      utility goes down
-    why do they occur?
-      trading stops as rounds fail to converge 
-    how to fight them
-      backtracking
-
-parameters
-==========
-  traders/rounds
-    single day
-    multiple days
-  seeds
-    stability across seeds
-  sizing (min/dynamic)
-    effect on time/convergence
-  finish count
-
-  constraints
-    metrics
-      speed
-      death spirals
-    
-    modes (new constraints)
-      fixed
-        constraint factor
-      last
-        suggested by paper
-      mean
-
-    reversion
-      mean
-      total
-      random
-
-    backtracks
-      needed to capture longer term problems
-      many variables being optimized at once, so will step on each others' toes sometimes
-
-      selection of backtrack points
-      probability
-      threshold
-
-comparison to centralised algorithms
-====================================
-  tatonnement
-  fancier, more efficient ones
-  divisible goods
 
 figures
 =======
