@@ -10,6 +10,7 @@
 \usepackage{amssymb}
 \usepackage[utf8]{inputenc}
 \usepackage{rotating}
+\usepackage{float}
 
 \graphicspath{ {images/} }
 \bibliography{report.bib}
@@ -27,7 +28,7 @@
 \textsc{\LARGE Honour School of Computer Science \\[0.2cm] and Philosophy}\\[0.5cm] % Major heading such as course name
 
 \HRule \\[0.4cm]
-{ \LARGE \bfseries Approximating Walrasian Equilibrium with Decentralized Bilateral Trade}\\[0.4cm] % Title of your document
+{ \LARGE \bfseries Approximating Walrasian Equilibrium with Decentralized Bilateral Trade}\\[0.3cm] % Title of your document
 \HRule \\[2cm]
  
 \begin{minipage}{0.45\textwidth}
@@ -62,39 +63,44 @@ Professor Paul Goldberg % Supervisor's Name
   We show that our algorithm is stable across different randomizations.
 \end{abstract}
 
+\tableofcontents
+\newpage
+
 \section{Introduction}
-The equilibrium conditions of markets have been widely studied in economics for hundreds of years.
-
-TODO: explain why WE is important
-
-TODO: rephrase this
-In economics, a market is said to be in Walrasian equilibrium (WE) when no market participants can make any more profitable trades, and none of them subsidized each other. 
-
-TODO: make this more mathematical
-
 Consider a market with $m$ traders and $n$ goods, where each trader $i$ begins with an endowment $\mathbf{w}_i \in \mathbb{R}^n_+ $ of some goods.
 Let $u_i : \mathbb{R}^n_+ \rightarrow \mathbb{R}$ be the utility function for trader $i$.
 (See Section \ref{background} for explanations of these terms.)
 A Walrasian equilibrium (WE) is a set of prices $\mathbf{p} \in \mathbb{R}^n_+$ and allocations of goods $\mathbf{x}_i \in \mathbb{R}^n_+$ which satisfies the following conditions:
-\[
+\begin{equation}\label{eq:goods}
   \sum_i \mathbf{x}_i = \sum_i \mathbf{w}_i 
-\]
-\[
-  \mathbf{p} \cdot \mathbf{x}_i = \mathbf{p} \cdot \mathbf{w}_i \quad \forall_i 
-\]
-\[
+\end{equation}
+\begin{equation}\label{eq:prefs}
   u_i(\mathbf{x'}) \leq u_i(\mathbf{x_i}) \quad
   \forall{i} \; \forall{\{\mathbf{x'} \in \mathbb{R}^n_+ \mid \mathbf{p} \cdot \mathbf{x'} \leq \mathbf{p} \cdot \mathbf{w}_i}\}
-\]
+\end{equation}
+\begin{equation}\label{eq:wealth}
+  \mathbf{p} \cdot \mathbf{x}_i = \mathbf{p} \cdot \mathbf{w}_i \quad \forall_i 
+\end{equation}
 
 An approximate WE relaxes one of these conditions.
 
-TODO: explain what each cond means
+Condition \ref{eq:goods} requires that the amount of each good is constant.
+This should be true no matter what trading occurs.
 
+Condition \ref{eq:prefs} means that the allocations are rational for the traders.
+They would not prefer any other allocation of the same or less value.
+If the first and second conditions hold, the allocation is Pareto-optimal.
 
-The purpose of this project was to learn how algorithms like that in \cite{crockett} perform in practice.
-TODO: more objectives
+Condition \ref{eq:wealth} requires that the traders do not gain or lose wealth during the trading.
+Intuitively, this means the traders can ``afford'' their final allocations.
+This is the condition we will relax.
 
+The equilibrium conditions of markets have been widely studied in economics for hundreds of years.
+They are important for understanding how markets arrive at prices, especially after shocks.
+Equilibrium theory is also important for both macro and microeconomic models. 
+% TODO: expand motivation
+
+The purpose of this project is to learn how decentralized algorithms for calculating WE, like that suggested by Crockett \cite{crockett}, perform in practice.
 We investigate finding an approximate WE using decentralized bilateral trade.
 In a given trading day, random pairs of traders make the largest trade possible until nobody can make any more trades. 
 Following each day, the traders update constraints on the prices they are willing to accept.
@@ -176,20 +182,6 @@ This seems very plausible, and it does work in practice for some special cases.
 However, Scarf showed that there were initial allocations could be chosen so as to be unstable under this procedure \cite{scarf}.
 Later research demonstrated that a modified tâtonnement procedure could be found, but only if the auctioneer has knowledge of all the traders' utility functions, including their gradients.
 
-In the field, there are several different ways an equilibrium model can learn about the world. 
-We use a utility oracle and a utility gradient oracle to access the preferences of two traders for a given allocation.
-Significantly, the algorithm does not need to know anything about the whole system at once.
-Another source is the aggregate demand oracle, which takes a vector of prices and gives the net supply and demand across the whole system.
-This is what tâtonnement uses to find an equilibrium.
-
-TODO: expand related work
-
-Fleischer et al. give performance guarantees using an aggregate demand oracle to find approximate WE \cite{fleischer}.
-
-\cite{chen}
-
-Leme and Wong give a polynomial algorithm for the indivisible goods case using an aggregate demand oracle \cite{leme}.
-
 Crockett, Spear, and Sunder investigate using trading to solve the divisible goods case \cite{crockett}.
 They pioneer the use of constraints learned by traders to reach a WE and prove convergence guarantees for the two-trader case.
 Unfortunately, they also show that there are cases where bilateral trade cannot find an exact equilibrium in the multitrader case.
@@ -197,6 +189,21 @@ Unfortunately, they also show that there are cases where bilateral trade cannot 
 In an unpublished note, Axtell and Goldberg suggested finding the quantitative performance of the algorithm suggested by Crockett, Spear, and Sunder \cite{goldberg}.
 This would be useful because it could be used to simulate a real market without a central clearing house, unlike the algorithms which rely on an aggregate demand oracle.
 We have used this as our starting point.
+
+
+In the field, there are several different ways an equilibrium model can learn about the world. 
+We use a utility oracle and a utility gradient oracle to access the preferences of two traders for a given allocation.
+Significantly, the algorithm does not need to know anything about the whole system at once.
+Another source is the aggregate demand oracle, which takes a vector of prices and gives the net supply and demand across the whole system.
+This is what tâtonnement uses to find an equilibrium.
+For some applications, like a store that only knows how much product it sells at each price, this is realistic.
+Fleischer et al. give performance guarantees using an aggregate demand oracle to find approximate WE \cite{fleischer}.
+Their algorithm is a variation on tâtonnement.
+Leme and Wong also use an aggregatte demand oracle to give a polynomial algorithm for the indivisible goods case \cite{leme}.
+% TODO: expand related work
+
+% \cite{chen}
+
 
 
 
@@ -237,7 +244,7 @@ To check for this, we track the number of consecutive attempted trades that are 
 For a simulation with $n$ traders, we wait for $n$ consecutive such empty trades.
 There is a parameter (--finish-count) that can increase or decrease this, but we found in practice that $n$ gives just as good results as $2n$ or $5n$, and is faster.
 
-\begin{figure}[h]
+\begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth]{allocations_(seed_13).png}
     \caption{
@@ -306,7 +313,7 @@ The elapsed clock time is also recorded, but this is less useful because it isn'
 We track these statistics over many days of trading, and use them to analyze the results.
 They are displayed in charts like that in Figure \ref{fig:conv}.
 
-\begin{figure}[h]
+\begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth]{seed_5.png}
     \caption{
@@ -335,7 +342,7 @@ For each model, we record the percentage of trials that converged, as well as th
 We also record those same statistics at the end of the trial, though they are typically very similar.
 The advantage of recording them at the end is that they can be compared across convergent and divergent cases.
 
-\begin{figure}[h]
+\begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth]{seed_0.png}
     \caption{
@@ -495,9 +502,9 @@ Backtracking greatly reduces the risk of divergence, which was the main issue in
     \multicolumn{ 1}{r}{} & 5-25 & 0\% & 98\% & 0.031 & 0.329 & 0.004 & 38,070 & 0.029 & 0.328 & 0.006 & 92,742 \\ 
     \multicolumn{ 1}{r}{} & 5-25-100 & 0\% & 99\% & 0.031 & 0.330 & 0.005 & 37,646 & 0.029 & 0.329 & 0.005 & 89,141 \\ 
     \multicolumn{ 1}{r}{50\%} & 5 & 16\% & 83\% & 0.035 & 0.324 & 0.007 & 31,801 & 0.029 & 0.310 & 0.014 & 79,027 \\ 
-    \multicolumn{ 1}{r}{} & 25 & \textbf{0\%} & \textbf{100\%} & \textbf{0.033} & \textbf{0.326} & \textbf{0.007} & \textbf{49,327} & \textbf{0.030} & \textbf{0.326} & \textbf{0.008} & \textbf{87,959} \\ 
+    \multicolumn{ 1}{r}{} & \textbf{25} & \textbf{0\%} & \textbf{100\%} & \textbf{0.033} & \textbf{0.326} & \textbf{0.007} & \textbf{49,327} & \textbf{0.030} & \textbf{0.326} & \textbf{0.008} & \textbf{87,959} \\ 
     \multicolumn{ 1}{r}{} & 5-25 & 0\% & 98\% & 0.034 & 0.330 & 0.007 & 31,508 & 0.033 & 0.327 & 0.007 & 90,156 \\ 
-    \multicolumn{ 1}{r}{} & 5-25-100 & \textbf{0\%} & \textbf{100\%} & \textbf{0.035} & \textbf{0.330} & \textbf{0.005} & \textbf{33,805} & \textbf{0.033} & \textbf{0.329} & \textbf{0.006} & \textbf{92,732} \\ 
+    \multicolumn{ 1}{r}{} & \textbf{5-25-100} & \textbf{0\%} & \textbf{100\%} & \textbf{0.035} & \textbf{0.330} & \textbf{0.005} & \textbf{33,805} & \textbf{0.033} & \textbf{0.329} & \textbf{0.006} & \textbf{92,732} \\ 
     \multicolumn{ 1}{l}{75\%} & 5 & 0\% & 97\% & 0.032 & 0.325 & 0.006 & 37,764 & 0.029 & 0.322 & 0.009 & 84,737 \\ 
     \multicolumn{ 1}{r}{} & 25 & 0\% & 99\% & 0.035 & 0.328 & 0.009 & 43,043 & 0.033 & 0.328 & 0.006 & 91,659 \\ 
     \multicolumn{ 1}{l}{} & 5-25 & 0\% & 97\% & 0.032 & 0.330 & 0.005 & 32,221 & 0.032 & 0.328 & 0.006 & 92,156 \\ 
@@ -559,8 +566,35 @@ We also increased the finish count from 1 to numbers between 10 and 50.
 This meant that the model would wait for more empty trades before finishing a day.
 This was necessary because the ratio of successful to empty trades is so much lower when the candidate MRS is chose randomly.
 
-After testing on a variety of finish counts, we can conclude that
-TODO: this
+%TODO: rerun with larger trial size
+
+After testing on a variety of finish counts, we can conclude that the algorithm gives broadly similar results without gradieents. 
+The non-gradients version has similar utility gains and lower (better) wealth transfers than the version with gradients.
+The MRS deviation is impressively low when finish-count is 50.
+Obviously, many times more trades must be attempted before convergence.
+However, this is less of an issue in practice, because the algorithm is faster per trade with random MRSs.
+The full results are in Table \ref{tab:ut}.
+
+The failure mode for the no-gradients version appears to be different than the gradients version.
+None of the models with finish-counts greater than 10 had any cases of divergence.
+However, none of the models had 100\% convergence.
+If we were using one of these models for a real simulation, we would reexamine our convergence criteria to determine whether they are suitable for this variation.
+
+\begin{sidewaystable}
+  \begin{tabular}{r|rr|rrrr|rrrr}
+    
+    & \multicolumn{1}{|l}{} & \multicolumn{1}{l}{} & \multicolumn{ 4}{|c|}{At Convergence} & \multicolumn{ 4}{c}{After 500 Days} \\ 
+    Finish Count & \multicolumn{1}{|l}{Div.} & \multicolumn{1}{l}{Conv.} & \multicolumn{1}{|l}{Wealth} & \multicolumn{1}{l}{Utility} & \multicolumn{1}{l}{MRS Dev.} & \multicolumn{1}{l}{Trades} & \multicolumn{1}{|l}{Wealth} & \multicolumn{1}{l}{Utility} & \multicolumn{1}{l}{MRS Dev.} & \multicolumn{1}{l}{Trades} \\ 
+    \hline
+    10 & 5\% & 25\% & 0.011 & 0.314 & 0.042 & 238,157 & 0.023 & 0.320 & 0.052 & 239,213 \\ 
+    20 & 0\% & 65\% & 0.019 & 0.323 & 0.021 & 490,495 & 0.025 & 0.325 & 0.042 & 569,163 \\ 
+    30 & 0\% & 85\% & 0.027 & 0.325 & 0.021 & 637,118 & 0.027 & 0.326 & 0.022 & 931,173 \\ 
+    40 & 0\% & 80\% & 0.023 & 0.329 & 0.011 & 744,508 & 0.028 & 0.327 & 0.023 & 1,301,897 \\ 
+    50 & 0\% & 90\% & 0.026 & 0.328 & 0.009 & 954,169 & 0.029 & 0.328 & 0.016 & 1,714,040 \\ 
+  \end{tabular}
+  \caption{Mean-mean model with no access to gradients.}
+  \label{tab:ut}
+\end{sidewaystable}
 
 \section{Conclusion}\label{conclusion}
 
@@ -568,7 +602,8 @@ TODO: this
 This project is a step towards better calculation of Walrasian equilibria via bilateral trade.
 We implemented a simulation framework that can test different models of constrained bilateral trade.
 We addressed a significant issue with the constraint-learning method of calculation with the novel addition of backtracking.
-% TODO: expand
+The model behaves the same on a fixed set of allocations across different seeds of the random number generator.
+This framework can be extended to a version without access to gradients.
 
 The main advantage of the techniques in this project over the existing methods available is that the information requirements are much lower. 
 We do not assume that there is a central auctioneer who can query everyone's preferences at the same time.
@@ -594,13 +629,17 @@ It would be very useful to compare this directly to the centralized ways of calc
 In particular, the utility gains from the actual equilibrium could be compared with the simulated results.
 If it was implemented in the same language, running time could also be compared in practice.
 
+We would like to test our model against a wider variety of utility functions, since it theoretically has the capability to simulate them.
+In particular, Leontief economies would be an interesting choice because they sometimes do not have exact equilibria.
+
+Further work to improve the quality of approximation is critical to using this in practice.
+Without any constraints, the markets tend to converge around 10\% transfer. 
+Reduction to a third of that is valuable, but not impressive enough to warrant using this technique as it stands.
+
 We only focused on the very simple case of two goods.
 Every centralized model supports more goods, which is more realistic.
 We believe this could be expanded to more goods, but it would take a substantial change to the code and was such outside the scope of the project.
 
-We would like to test our model against a wider variety of utility functions, since it theoretically has the capability to simulate them.
-
-Further work to improve the quality of approximation is critical to using this in practice.
 
 
 \section{Acknowledgements}\label{acknowledgements}
