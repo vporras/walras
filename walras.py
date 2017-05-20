@@ -392,6 +392,17 @@ class TrialSummary():
                 return self
             return TrialSummary.Stats(*[x + y for (x, y) in zip(self, other)])
 
+        def __sub__(self, other):
+            if other is None or other is 0:
+                return self
+            return TrialSummary.Stats(*[x - y for (x, y) in zip(self, other)])
+
+        def __pow__(self, e):
+            if e is None:
+                return self
+            return TrialSummary.Stats(*[x ** e for x in self])
+
+
         def __radd__(self, other):
             return self + other
 
@@ -537,18 +548,22 @@ def run(config):
     pct_conv = num_conv / config.trials
     pct_div  = len([d for d in data if d.did_div]) / config.trials
 
+    var_end = sum([(d.end - avg_end) ** 2 for d in data]) / config.trials
+    std_end = var_end ** 0.5
+
     # We make two strings, human and machine readable
 
-    human = "end: %s" % str(avg_end)
+    human = "end avg: %s" % str(avg_end)
+    human += "\nend std: %s" % str(std_end)
     if pct_conv > 0:
-        human += "\nconv: %s" % str(avg_conv)
+        human += "\nconv avg: %s" % str(avg_conv)
     human += "\nconverged: %3.f%%" % (pct_conv * 100)
     human += "\ndiverged: %3.f%%" % (pct_div * 100)
 
     # hack to fix printing later
     if pct_conv == 0:
         avg_conv = [np.nan] * 6
-    mach = [str(x) for x in [config.experiment, pct_div, pct_conv, *avg_conv, *avg_end]]
+    mach = [str(x) for x in [config.experiment, pct_div, pct_conv, *avg_conv, *avg_end, *std_end]]
 
     if config.verbosity >= 1:
         print("seed conv  div")
