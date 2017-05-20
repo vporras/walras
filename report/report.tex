@@ -59,7 +59,7 @@ Professor Paul Goldberg % Supervisor's Name
 \begin{abstract}
   We study the Walrasian equilibria of markets with $n$ traders and 2 goods.
   We simulate the convergence of such a market through decentralized randomized bilateral trade.
-  Traders learn constraints on the MRSs of the goods to minimize loss of wealth.
+  Traders learn constraints on the prices of the goods to minimize loss of wealth.
   To avoid divergence while searching for constraints, we introduce the technique of backtracking.
   We show that our algorithm is stable across different randomizations.
 \end{abstract}
@@ -76,8 +76,9 @@ In economics, we say that prices can form an equilibrium when they stabilize.
 The equilibrium conditions of markets have been widely studied in economics for hundreds of years.
 Equilibrium theory is important for understanding how markets arrive at prices, especially after shocks. 
 is also used to develop and test both macro and microeconomic models. 
-A Walrasian equilibrium is a useful formalization of an equilibrium in a competitive market.
-This project explores techniques for calculating the Walrasian equilibrium of a market with two divisible goods.
+A Walrasian equilibrium (WE) is a useful formalization of an equilibrium in a competitive market.
+This project explores techniques for calculating the WE of a market with two divisible goods.
+% TODO: Give an actual (but informal) definition of a "Walsrian equilibrium"
 
 The purpose of this project is to learn how decentralized algorithms for calculating WE, like that suggested by Crockett \cite{crockett}, perform in practice.
 We investigate finding an approximate WE using decentralized bilateral trade.
@@ -85,6 +86,7 @@ In a given trading day, random pairs of traders make the largest trade possible 
 Following each day, the traders update constraints on the prices they are willing to accept.
 After many days of tightening constraints, the market should converge to a stable set of prices and allocations, the approximate WE.
 We implemented this algorithm in Python and experimented with different techniques of updating the constraints.
+% TODO: Why? What is the point of implementing this? To get some kinds of insight? What are they?
 
 The naive implementation of this algorithm often failed to converge, and would instead diverge catastrophically, as the traders because over-constrained.
 That made it unsuitable for finding the WE of a market.
@@ -109,7 +111,7 @@ An assignment of goods to traders is called an \textit{allocation}.
 Each trader in our world will receive an initial \textit{endowment} allocation of goods, which they can trade with the others.
 Thus, the allocation will change throughout a day of trading.
 
-The \textit{marginal rate of substitution} between the two goods will be used throughout to represent price.
+The \textit{marginal rate of substitution} (MRS) between the two goods will be used throughout to represent price.
 It applies to both potential and actual trades.
 We always express the MRS and gradient (defined below) as units of good 2 per unit good 1.
 For instance, a trade of 4 units of good 1 for 1 unit of good 2 has an MRS of 0.25.
@@ -117,6 +119,7 @@ For instance, a trade of 4 units of good 1 for 1 unit of good 2 has an MRS of 0.
 The \textit{direction} of a trade is either ``Buy'' or ``Sell'', from the perspective of a given trader.
 Direction is also expressed in terms of good 1, so a ``Buy'' means the trader is gaining good 1 by giving up good 2.
 The direction is antisymmetric: a ``Buy'' for one trader is a ``Sell'' for their trading partner.
+% TODO: Is antisymmetric the right word here?
 
 Utility functions capture the preferences of the actors in an economic model.
 Utility is often associated with the pleasure or satisfaction that an actor gets from a situation.
@@ -188,12 +191,13 @@ This seems very plausible, and it does work in practice for some special cases.
 
 However, Scarf showed that there were initial allocations could be chosen so as to be unstable under this procedure \cite{scarf}.
 Later research demonstrated that a modified tâtonnement procedure could be found, but only if the auctioneer has knowledge of all the traders' utility functions, including their gradients.
+% TODO: Cite the later research. Give references.
 
 Crockett, Spear, and Sunder investigate using trading to solve the divisible goods case \cite{crockett}.
 They pioneer the use of constraints learned by traders to reach a WE and prove convergence guarantees for the two-trader case.
 Unfortunately, they also show that there are cases where bilateral trade cannot find an exact equilibrium in the multi-trader case.
 
-In an unpublished note, Axtell and Goldberg suggested finding the quantitative performance of the algorithm suggested by Crockett, Spear, and Sunder \cite{goldberg}.
+In an unpublished note \cite{goldberg}, Axtell and Goldberg suggested finding the quantitative performance of the algorithm suggested by Crockett, Spear, and Sunder .
 This would be useful because it could be used to simulate a real market without a central clearing house, unlike the algorithms which rely on an aggregate demand oracle.
 We have used this as our starting point.
 
@@ -214,6 +218,7 @@ Leme and Wong also use an aggregate demand oracle to give a polynomial algorithm
 
 \section{Design and Implementation}\label{desimp}
 We created a software framework to implement the algorithm above and test it with different parameters.
+% TODO: Again, it would help if you explicitly stated your intent in I implementing into this algorithm. 
 We used Python to build it, because it allowed for rapid prototyping and flexible experimentation.
 The program runs multiple trials of the same parameters where each trial consists of many days of trading.
 Here, we discuss the details of the algorithm as implemented, and the concepts that were important to the implementation.
@@ -399,6 +404,7 @@ For some models with 0\% convergence, the quality of convergence metrics are obv
 \section{Results}\label{results}
 \subsection{Simple Constraint Choice}
 First, we investigated three ways of choosing constraints and three ways of reverting them.
+% TODO: Are we these "ways" an original invention of yours? Is so, say this. Giv some rationale for choosing these ways. They are not just random whims, are they?
 The constraint choice is the action a trader takes when they lose wealth.
 Reversion is when a constraint fails, and a trader needs to relax it.
 
@@ -672,7 +678,7 @@ We believe this could be expanded to more goods, but it would take a substantial
 \section{Acknowledgements}\label{acknowledgements}
 I would like to thank my supervisor, Paul Goldberg, for the original idea for this project and for all his advice along the way.
 
-% I would also like to thank my tutor, Prof. Thomas Melham for reviewing a draft of this report.
+I would also like to thank my tutor, Professor Thomas Melham, for reviewing a draft of this report.
 
 \printbibliography
 
