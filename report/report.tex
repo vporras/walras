@@ -13,10 +13,13 @@
 \usepackage{float}
 \usepackage{pgfplots}
 \usepackage{subcaption}
+
 % \pgfplotsset{compat=1.10}
 
 \usepgfplotslibrary{fillbetween}
 
+\newcommand{\co}[1]{\texttt{#1}}
+% TODO: choose this (small caps, monospace, sans serif)
 
 \graphicspath{ {images/} }
 \bibliography{report.bib}
@@ -31,10 +34,11 @@
 \center % Center everything on the page
  
 \textsc{\LARGE University of Oxford}\\[1.5cm] % Name of your university/college
-\textsc{\LARGE Honour School of Computer Science \\[0.2cm] and Philosophy}\\[0.5cm] % Major heading such as course name
+\textsc{\LARGE Honour School of Computer~Science \\[0.2cm] and Philosophy}\\[0.5cm] % Major heading such as course name
 
 \HRule \\[0.4cm]
-{ \LARGE \bfseries Approximating Walrasian Equilibrium with Decentralized Bilateral Trade}\\[0.3cm] % Title of your document
+\textbf{\LARGE Approximating Walrasian Equilibria} \\[0.3cm]
+\textbf{\LARGE with Decentralized Bilateral Trade}\\[0.1cm]
 \HRule \\[2cm]
  
 \begin{minipage}{0.45\textwidth}
@@ -80,30 +84,39 @@ In economics, we say that prices can form an equilibrium when they stabilize.
 
 The equilibrium conditions of markets have been widely studied in economics for hundreds of years.
 Equilibrium theory is important for understanding how markets arrive at prices, especially after shocks. 
-is also used to develop and test both macro and microeconomic models. 
-A Walrasian equilibrium (WE) is a useful formalization of an equilibrium in a competitive market.
-This project explores techniques for calculating the WE of a market with two divisible goods.
-% TODO: Give an actual (but informal) definition of a "Walsrian equilibrium"
+It is also used to develop and test both macro and microeconomic models. 
+Economic models are ultimately useful for making economic forecasts.
+We want to make the best predictions possible as well as understand why certain predictions fail.
+For example, we want to know why prices can settle even in decentralized markets, where buyers and sellers transact directly, without a central intermediary.
+On the other hand, financial markets have turbulent prices despite rapid information sharing and price discovery.
 
-The purpose of this project is to learn how decentralized algorithms for calculating WE, like that suggested by Crockett \cite{crockett}, perform in practice.
-We investigate finding an approximate WE using decentralized bilateral trade.
+A Walrasian equilibrium (WE) is a useful formalization of an equilibrium in a competitive market.
+Essentially, it is a set of prices at which the supply of every good equals its demand.
+We give a rigorous definition in Section \ref{background}.
+There are many fast algorithms for calculating the WE of a market when there is access to a central information source.
+These are useful for modelling official markets with a central trading venue and easily accessible price data, like a stock exchange or an art auction.
+Decentralized markets have been less studied, but they are also a crucial part of trade.
+For example, while stocks are usually traded on public exchanges, bonds are still mostly traded over the phone, in private.
+Other goods are traded even more informally, some via online markets like Craigslist and Gumtree.
+Understanding how prices evolve in these markets is crucial to understanding the modern economy.
+
+The purpose of this project is to learn how decentralized algorithms for calculating the WE, like that suggested by Crockett, Spear, and Sunder \cite{crockett}, perform in practice.
+We investigate finding an approximate WE using bilateral trade.
 In a given trading day, random pairs of traders make the largest trade possible until nobody can make any more trades. 
 Following each day, the traders update constraints on the prices they are willing to accept.
 After many days of tightening constraints, the market should converge to a stable set of prices and allocations, the approximate WE.
 We implemented this algorithm in Python and experimented with different techniques of updating the constraints.
 % TODO: Why? What is the point of implementing this? To get some kinds of insight? What are they?
 
-The naive implementation of this algorithm often failed to converge, and would instead diverge catastrophically, as the traders because over-constrained.
+The naive implementation of this algorithm often failed to converge, and would instead diverge catastrophically, as the traders become over-constrained.
 That made it unsuitable for finding the WE of a market.
-To fix this, we developed a technique of backtracking to previous constraints with some probability when utility fell below a threshold.
+To solve the problem of divergence, we developed a technique of backtracking to previous constraints with some probability when utility fell below a threshold.
 This made it possible to reliably simulate a market and obtain useful results.
 
 We show that with backtracking, this algorithm finds approximate Walrasian equilibria consistently, and does not diverge.
 We also show that the randomized algorithm gives the same results for a given endowment across multiple runs with different random numbers.
 Lastly, we extend the algorithm to work without access to the gradient of the traders' utility functions.
 
-
-The rest of this report is organized as follows.
 Section~\ref{background} is an explanation of the economic aspects of the project and its relation to previous work.
 In Section~\ref{desimp}, we discuss the model we use and the choices we made when implementing it.
 Section~\ref{results} contains the results we obtained from our simulations.
@@ -111,7 +124,7 @@ We analyse the success of the project and compare it to other methods in Section
 
 \section{Background}\label{background}
 
-This project focuses on simulating a world with two divisible goods that can be exchanged between a number of traders.
+This project focuses on simulating a world with multiple traders that exchange two divisible goods amongst themselves.
 An assignment of goods to traders is called an \textit{allocation}.
 Each trader in our world will receive an initial \textit{endowment} allocation of goods, which they can trade with the others.
 Thus, the allocation will change throughout a day of trading.
@@ -124,7 +137,7 @@ For instance, a trade of 4 units of good 1 for 1 unit of good 2 has an MRS of 0.
 The \textit{direction} of a trade is either ``Buy'' or ``Sell'', from the perspective of a given trader.
 Direction is also expressed in terms of good 1, so a ``Buy'' means the trader is gaining good 1 by giving up good 2.
 The direction is antisymmetric: a ``Buy'' for one trader is a ``Sell'' for their trading partner.
-% TODO: Is antisymmetric the right word here?
+% TODO: check with Toby: antisymmetric the right word here?
 
 Utility functions capture the preferences of the actors in an economic model.
 Utility is often associated with the pleasure or satisfaction that an actor gets from a situation.
@@ -133,18 +146,19 @@ In general, a utility function is a function from states of the world to utiliti
 
 Consider a market with $m$ traders and $n$ goods, where each trader $i$ begins with an endowment $\mathbf{w}_i \in \mathbb{R}^n_+ $ of some goods.
 Let $u_i : \mathbb{R}^n_+ \rightarrow \mathbb{R}$ be the utility function for trader $i$.
-(See Section \ref{background} for explanations of these terms.)
 A Walrasian equilibrium (WE) is a set of prices $\mathbf{p} \in \mathbb{R}^n_+$ and allocations of goods $\mathbf{x}_i \in \mathbb{R}^n_+$ which satisfies the following conditions:
 \begin{equation}\label{eq:goods}
   \sum_i \mathbf{x}_i = \sum_i \mathbf{w}_i 
 \end{equation}
 \begin{equation}\label{eq:prefs}
-  u_i(\mathbf{x'}) \leq u_i(\mathbf{x_i}) \quad
+  u_i(\mathbf{x'}) \leq u_i(\mathbf{x}_i) \quad
   \forall{i} \; \forall{\{\mathbf{x'} \in \mathbb{R}^n_+ \mid \mathbf{p} \cdot \mathbf{x'} \leq \mathbf{p} \cdot \mathbf{w}_i}\}
 \end{equation}
 \begin{equation}\label{eq:wealth}
-  \mathbf{p} \cdot \mathbf{x}_i = \mathbf{p} \cdot \mathbf{w}_i \quad \forall_i 
+  \mathbf{p} \cdot \mathbf{x}_i = \mathbf{p} \cdot \mathbf{w}_i \quad \forall{i} 
 \end{equation}
+
+% TODO: check these maths with Toby
 
 An approximate WE relaxes one of these conditions.
 
@@ -154,6 +168,7 @@ This should be true no matter what trading occurs.
 Condition \ref{eq:prefs} means that the allocations are rational for the traders.
 They would not prefer any other allocation of the same or less value.
 If the first and second conditions hold, the allocation is Pareto-optimal.
+% TODO: reference/explain Pareto?
 
 Condition \ref{eq:wealth} requires that the traders do not gain or lose wealth during the trading.
 Intuitively, this means the traders can ``afford'' their final allocations.
@@ -167,21 +182,22 @@ We use the Cobb-Douglas utility function:
 where x and y are the quantities of the goods.
 The parameter p is adjusted to give traders different preferences.
 
-% TODO: rephrase this for clarity
+% TODO: rephrase this for clarity, explain contour, diagram?
 Because this function is differentiable, we can calculate the gradient.
-This makes it possible to calculate the slope of the line tangent to the function which is 
+This makes it possible to calculate the slope of the line tangent to the indifference contour, which is
 \[
   \frac{(1-p)y}{px}
 \]
+This slope is a bound on the MRS that a trader can accept for the trade to increase their utility.
 
 Closely related to utility is the concept of wealth.
 Given allocation $\mathbf{x}$ and MRS $p$, wealth is $ px_1 + x_2 $.
 Utility is a subjective measure based on the trader's preferences, while wealth is objective and based on the market.
 While it is impossible for a trader to lose utility during a day, they can lose wealth.
 This can happen when one trader has a disproportionately high amount of a good that a market values.
-They can sell it for too cheaply at first, when they could have demanded a higher price.
+They can sell it too cheaply at first, when they could have demanded a higher price.
 When this occurs, the trader who loses wealth is called a subsidizer.
-This terminology was introduced by Crockett, Spear, and Sunder \cite{crockett}.
+This terminology was introduced by Crockett et al. \cite{crockett}.
 
 We will refer to the random number generator later in this report.
 As in most applications, we actually use a \textit{pseudo-random} number generator.
@@ -191,42 +207,39 @@ For other programs, the current time is often used as a seed so the sequence is 
 However for our purposes, we will use specific seeds to get reproducible results and still reap the benefits of a randomized algorithm.
 
 There is a long history of trial-and-error techniques in this field.
-Walras' original idea for finding equilibrium is called tâtonnement, which literally means trial-and-error in French.
+Walras' original idea for finding equilibrium is called \textit{tâtonnement}, which literally means trial-and-error in French.
 His approach was to have a centralized auctioneer pick a price, calculate the aggregate supply and demand, then adjust the price accordingly.
 This seems very plausible, and it does work in practice for some special cases.
 
-However, Scarf showed that there were initial allocations could be chosen so as to be unstable under this procedure \cite{scarf}.
+However, Scarf showed that there were initial allocations which could be chosen so as to be unstable under this procedure \cite{scarf}.
 Later research demonstrated that a modified tâtonnement procedure could be found, but only if the auctioneer has knowledge of all the traders' utility functions, including their gradients.
 % TODO: Cite the later research. Give references.
 
-Crockett, Spear, and Sunder investigate using trading to solve the divisible goods case \cite{crockett}.
+Crockett et al. investigate using trading to solve the divisible goods case \cite{crockett}.
 They pioneer the use of constraints learned by traders to reach a WE and prove convergence guarantees for the two-trader case.
 Unfortunately, they also show that there are cases where bilateral trade cannot find an exact equilibrium in the multi-trader case.
 
-In an unpublished note \cite{goldberg}, Axtell and Goldberg suggested finding the quantitative performance of the algorithm suggested by Crockett, Spear, and Sunder .
+In an unpublished note, Axtell and Goldberg \cite{goldberg} suggested finding the quantitative performance of the algorithm suggested by Crockett et al.
 This would be useful because it could be used to simulate a real market without a central clearing house, unlike the algorithms which rely on an aggregate demand oracle.
 We have used this as our starting point.
 
 
-In the field, there are several different ways an equilibrium model can learn about the world. 
-We use a utility oracle and a utility gradient oracle to access the preferences of two traders for a given allocation.
+In this field, there are several different ways an equilibrium model can learn about the world. 
+We use a utility oracle and a utility gradient oracle to access the preferences of traders for a given allocation.
+At any one time, we only access the oracles for the two traders involved in a potential trade.
 Significantly, the algorithm does not need to know anything about the whole system at once.
-Another source is the aggregate demand oracle, which takes a vector of prices and gives the net supply and demand across the whole system.
-This is what tâtonnement uses to find an equilibrium.
-For some applications, like a store that only knows how much product it sells at each price, this is realistic.
-Fleischer et al. give performance guarantees using an aggregate demand oracle to find approximate WE \cite{fleischer}.
+Another option is the aggregate demand oracle, which takes a vector of prices and gives the net supply and demand across the whole system; this is what tâtonnement uses to find an equilibrium.
+This is realistic for some applications, like a store that only knows how much of a product it sells at each price.
+Fleischer et al. give performance guarantees using an aggregate demand oracle to find the approximate WE \cite{fleischer}.
 Their algorithm is a variation on tâtonnement.
+% TODO: which variation? add more details
 Leme and Wong also use an aggregate demand oracle to give a polynomial algorithm for the indivisible goods case \cite{leme}.
-% TODO: expand related work
-
-% \cite{chen}
-
 
 \section{Design and Implementation}\label{desimp}
 We created a software framework to implement the algorithm above and test it with different parameters.
-% TODO: Again, it would help if you explicitly stated your intent in I implementing into this algorithm. 
+% TODO: Again, it would help if you explicitly stated your intent in implementing into this algorithm. 
 We used Python to build it, because it allowed for rapid prototyping and flexible experimentation.
-The program runs multiple trials of the same parameters where each trial consists of many days of trading.
+The program runs multiple trials using the same parameters, where each trial consists of many days of trading.
 Here, we discuss the details of the algorithm as implemented, and the concepts that were important to the implementation.
 In particular, we discuss the goal of convergence and the challenge of divergence.
 
@@ -244,9 +257,6 @@ In the standard model (see Section \ref{nograd} for the version without access t
 This joint MRS is the exchange rate used for the potential.
 We experimented with randomly picking an MRS between the two traders' MRSs, but this was slower and gave worse results.
 
-% TODO: paragraph on advantages of geometric mean
-% The geometric mean has the nice property of being symmetrical between buying and selling. 
-
 Then, we calculate the size of the biggest possible trade that can occur at that MRS.
 A trade can occur if, after reallocation, both traders would have higher utilities.
 We test progressively larger sizes, doubling each time.
@@ -260,7 +270,8 @@ We use this later on to assess the quality of the simulation.
 The simulation of a day ends once traders can make no more mutually beneficial trades.
 To check for this, we track the number of consecutive attempted trades that are rejected. 
 For a simulation with $n$ traders, we wait for $n$ consecutive such empty trades.
-There is a parameter (--finish-count) that can increase or decrease this, but we found in practice that $n$ gives just as good results as $2n$ or $5n$, and is faster.
+There is a parameter that can increase or decrease this, but we found in practice that $n$ gives just as good results as $2n$ or $5n$, and is faster.
+We do adjust that parameter when we get to the no-gradient case in Section \ref{nograd}.
 
 \begin{figure}[H]
     \centering
@@ -270,7 +281,9 @@ There is a parameter (--finish-count) that can increase or decrease this, but we
       The green contours are lines of equal utility.
       Notice how the trades only increase utility.
       The red dots are the final positions of traders.
-      % TODO: explain dotted lines, all parallel
+      The dotted lines are the bounds on the MRS.
+      A trader will only trade above those lines.
+      % TODO: explain this better
     }
     \label{fig:day}
 \end{figure}
@@ -348,37 +361,47 @@ There is a parameter (--finish-count) that can increase or decrease this, but we
         ];
       \end{axis}
     \end{tikzpicture}  
-    \caption{With constraint at 0.7}
+    \caption{With selling constraint at 0.7}
   \end{subfigure}%
   
   \caption{
-    Wealth
-    % TODO: explain wealth diagram
+    This shows the MRSs that a subsidiser trades at over two days.
+    The trader is selling, so they prefer a higher MRS.
+    The shaded area is the wealth lost by not trading at the final price immediately.
+    On the second day, the trader adds a selling constraint at 0.7, which means they lose less wealth.
+    % TODO: more explanation
   }
   \label{fig:wealth}
 \end{figure}
 
 \subsection{Updating Constraints}
-In order to have useful changes from one day to the next, the traders must change their behaviour.
-They achieve this by updating the constraints on the MRSs they will accept for buying and selling.
+In order to get better outcomes from one day to the next, the traders must change their behaviour.
+They achieve this by updating the constraints on the MRSs they will accept.
+
+Each trader has two constraints: buying and selling.
+The buying constraint is the highest MRS they will pay to buy good 1.
+The selling constraint is the lowest MRS they will accept to sell good 1.
 
 Using the definition of wealth from above, and the last MRS used globally, each trader calculates the wealth they gained or lost during the day.
 
 Recall that no traders will accept trades that cause them to lose utility. 
 Thus, they will have a non-negative utility gain, which we can calculate by subtracting the utility of the initial endowment from the utility of the final allocation after a day's worth of trades.
 
-First, if the trader updated their constraint from the previous day, they compare their wealth and utility gains from today to those from yesterday.
+First, if the trader updated their constraint on the previous day, they evaluate its effectiveness.
+They compare their wealth and utility gains from today to those from yesterday.
 If the new constraint resulted in less utility or the same utility and less wealth, the constraint is reverted to its previous value.
 
-When there was not a new constraint on the previous day or the constraint was successful, the trader considers tightening the constraint.
+If they did not update their constraint on the previous day, the trader considers tightening it.
 \begin{itemize}
-  \item If they gained wealth during the day, they are happy with the MRSs they are accepting, so they don't make any changes.
-  \item If they lost wealth, they determine whether they were a net buyer or seller of good 1.
-  \item If they were a net buyer, they decrease their buying constraint, which is the highest price they will pay to buy good 1.
-  \item If they were a net seller, they increase their selling constraint instead.
+  \item If the trader gained wealth during the day, they are happy with the MRSs they are accepting, so they don't make any changes.
+  \item If the trader lost wealth, they determine whether they were a net buyer or seller of good 1:
+    \begin{itemize}
+      \item If the trader was a net buyer, they decrease their buying constraint.
+      \item If the trader was a net seller, they increase their selling constraint instead.
+    \end{itemize}
 \end{itemize}
 
-
+See Figure \ref{fig:wealth} for an example of this procedure.
 We will discuss the exact method of tightening in Section \ref{results}, when we compare different techniques.
 
 \subsection{Statistics}
@@ -391,15 +414,13 @@ It increases initially then settles as the traders learn constraints that help t
 It can decrease if the traders become over-constrained.
 
 The wealth transfer is the sum of the absolute value of wealth gained or lost, divided by the total wealth at the beginning.
-Like above, it is marked to the used for the final successful trade.
+Like above, it is marked to the MRS of the final successful trade.
 This should approach 0 as subsiders apply constraints to prevent themselves from losing wealth.
 
 As mentioned above, each trader has a most recent MRS they personally traded at.
 In the ideal case, these all converge to the same value over the day, because if two traders disagree about MRS they can make a mutually beneficial trade.
 To evaluate how close a simulation comes to this ideal, we calculate the standard deviation of the most recent MRS for each trader.
 
-% TODO: use diagram to explain this
-    
 We calculate constrainedness based on the constraints used by each trader in the past day.
 There are initial buy and sell constraints that every trader begins with.
 This is the percentage of the original range between constraints that traders accept on average.
@@ -419,7 +440,7 @@ They are displayed in charts like that in Figure \ref{fig:conv}.
     \centering
     \includegraphics[width=\textwidth]{seed_5.png}
     \caption{
-      Convergence with mean constraint with mean reversion, for 100 traders.
+      Convergence for 100 traders.
       Notice how all the statistics stabilize, and MRS deviation is small.
     }
     \label{fig:conv}
@@ -450,7 +471,7 @@ The advantage of recording them at the end is that they can be compared across c
     \centering
     \includegraphics[width=\textwidth]{seed_0.png}
     \caption{
-      Divergence with mean constraint with mean reversion, for 100 traders.
+      Divergence for 100 traders.
       Notice how utility falls around day 100 and MRS deviation increases dramatically.
     }
     \label{fig:div}
@@ -468,11 +489,11 @@ We discovered this phenomenon when we tried the simpler models of constraint cho
 Every model would diverge in this manner on some trials, even after it had reached an acceptable state.
 We wanted to avoid this in potential models, so we developed a criteria for identifying them automatically.
 
-Specifically, we say a trial diverges on day $d$ if:
-\begin{description}[align=right,labelwidth=2cm,font=\normalfont]
-\item[1.] Utility gains fall at least 5\% from the first day to $d$ 
-\item[AND 2.] MRS deviation is greater than 0.1 on day $d$
-\end{description}
+Specifically, we say a trial diverges on day $d$ if both:
+\begin{enumerate}
+  \item Utility gains fall at least 5\% from the first day to $d$ 
+  \item MRS deviation is greater than 0.1 on day $d$
+\end{enumerate}
 We use a moving average to smooth out condition 1.
     
 To avoid divergence, we developed the technique of backtracking, which is discussed in Section \ref{backtrack}.
@@ -480,10 +501,12 @@ To avoid divergence, we developed the technique of backtracking, which is discus
 \subsection{Testing}
 Due to the wide parameter space and the length of time to construct experiments, we had to focus on analysing some parameters, leaving others fixed.
 We tested on models of 100 traders, because they showed the same dynamics as larger models, but still could be tested in only a couple of minutes per trial.
-We ran each trial for 500 days, because most interesting things happened in days 50 to 150, and no model that we looked at diverged or converged after day 500.
+We ran each trial for 500 days, because most interesting things happened in days 50 to 150.
+In preliminary experiments over 1000 days, none diverged or converged after day 500.
 
-We tested 100 trials of each model, using different allocations for each trial.
-(Except for the stability experiments below)
+%TODO: write about choice of alpha
+
+We tested 100 trials of each model, using different allocations for each trial (except for the stability experiments below).
 We generated the endowments uniformly at random in the range $[0, 1)$.
 However, we tested each model on the same 100 sets of endowments.
 This means that any variations between models was not due to different endowments.
@@ -497,38 +520,39 @@ For some models with 0\% convergence, the quality of convergence metrics are obv
 First, we investigated three ways of choosing constraints and three ways of reverting them.
 % TODO: Are we these "ways" an original invention of yours? Is so, say this. Giv some rationale for choosing these ways. They are not just random whims, are they?
 The constraint choice is the action a trader takes when they lose wealth.
-Reversion is when a constraint fails, and a trader needs to relax it.
+The day after updating a constraint, a trader checks whether they have lost utility.
+If they have, we say the constraint has \textit{failed}, and the trader needs some method of \textit{reversion} for relaxing the constraint.
 
-Under fixed constraint choice, when a trader loses wealth, they contract their constraint by a fixed percentage.
+Under \co{fixed} constraint choice, when a trader loses wealth, they contract their constraint by a fixed percentage.
 This has the advantage of being simple to implement, and fast to evaluate.
 It also would not require knowing the last MRS of the trader.
 We tested this in three variations, with 5\%, 10\% and 20\% constraint factors.
 For example, if the selling constraint was 5.0, a 10\% constraint factor would raise that to 5.5.
     
-Last MRS constraint choice means that trader sets the constraint to the last MRS used.
+\co{Last} MRS constraint choice means that trader sets the constraint to the last MRS used.
 This could lead to very quick convergence, because the trader would instantly adapt to the market price.
 
-Mean constraint choice results in the trader setting the constraint to the geometric mean of the last price and the current constraint.
-This moves more smoothly than last price and is more adaptive than fixed.
+\co{Mean} constraint choice results in the trader setting the constraint to the geometric mean of the last price and the current constraint.
+This moves more smoothly than \co{last} and is more adaptive than \co{fixed}.
 
-When a trader uses total reversion, they revert to the previous constraint when the current one fails.
+When a trader uses \co{total} reversion, they revert to the previous constraint when the current one fails.
 
-Mean reversion is reverting to the geometric mean of the current constraint and the old constraint.
-When combined with mean choice, it is analogous to binary search over constraints, if we assume there is a fixed ``best'' constraint.
-The constraints narrow around the ideal, with half the (log) range eliminated each step.
+\co{Mean} reversion is reverting to the geometric mean of the current constraint and the old constraint.
+When combined with \co{mean} choice, it is analogous to binary search over constraints, if we assume there is a fixed ``best'' constraint.
+The constraints narrow around the ideal, with half the ($\log$) range eliminated each step.
 
-Random reversion means that the trader reverts to a random MRS between the current constraint and the old constraint.
+\co{Random} reversion means that the trader reverts to a random MRS between the current constraint and the old constraint.
 
 We tested all 15 combinations of constraint choice and reversion.
 The full results are listed in Table \ref{tab:simple}.
 The results were not particularly encouraging, with 77\% of trials diverging and only 15\% converging across the board.
-Mean constraint choice was by far the most effective, with 63\% converging.
-Mean choice with random reversion had 96\% convergence and only 1\% divergence.
-However, it took almost three times as many trades to converge as mean-mean.
-Mean-mean was efficient, but only converged 52\% of the time.
-Total reversion was slower and less convergent than mean-mean.
+\co{Mean} constraint choice was by far the most effective, with 63\% converging.
+\co{Mean} choice with \co{random} reversion had 96\% convergence and only 1\% divergence.
+However, it took almost three times as many trades to converge as \co{mean}-\co{mean}.
+\co{Mean}-\co{mean} was efficient, but only converged 52\% of the time.
+\co{Total} reversion was slower and less convergent than \co{mean}-\co{mean}.
 All three had similar MRS divergence and utility gains at convergence.
-Mean-random came out on top with only 3.7\% wealth transfers, a little ahead of mean-mean with 4.5\%.
+\co{Mean}-\co{random} came out on top with only 3.7\% wealth transfers, a little ahead of \co{mean}-\co{mean} with 4.5\%.
 
 The high divergence comes from the adoption of constraints that happen to increase utility in the short term, but end up reducing the number of profitable trades.
 A trader might add a constraint that severely restricts the number of other traders who are willing to trade.
@@ -539,9 +563,10 @@ If enough traders end up in this situation, some will keep bad constraints.
 Eventually, there are too many constraints for traders to make all the mutually beneficial trades that they would do otherwise.
 
 We analysed the results to determine how to improve the algorithm.
+We considered improving the efficieny of \co{mean}-\co{random} or the quality of \co{mean}-\co{mean}.
 While there are some gains to be made on the efficiency front, a faster implementation would make the speed per trade faster, and thus would benefit both models equally.
-However, any additional complexity would make both slower, but might increase the convergence of the mean-mean model.
-Based on these observations, we decided to focus on improving the convergence of the algorithm with mean constraint choice and mean reversion.
+However, any additional complexity would make both slower, but might increase the convergence of the \co{mean}-\co{mean} model.
+Based on these observations, we decided to focus on improving the convergence of the algorithm with \co{mean} constraint choice and \co{mean} reversion.
 
 
 \begin{sidewaystable}
@@ -577,17 +602,19 @@ The main novel idea in this paper is the application of backtracking to this pro
 Backtracking means looking at past constraints, and if they gave better utility, switching to them with some positive probability.
 The theoretical justification for this is that many variables are being optimized at once and many factors can affect the utility of a trader.
 The trader's own actions, other traders' actions and randomness can all change the utility from day to day.
-When a constraint is added initially, the trader keeps it they gain utility in the day immediately after.
-However, it is possible that the supposed gain in utility actually came from other factors, and the constraint is negative in the long run.
+When a constraint is added initially, the trader keeps it if they gain utility in the day immediately after.
+However, it is possible that the supposed gain in utility actually came from other factors, and the constraint is detrimental in the long run.
 It is also possible that the constraint might be good in the absence of other traders' behaviour, but as they all adapt, the constraint ends up being too tight.
 Thus, it sometimes might be the case that a constraint needs to be relaxed quite a bit to find the optimal solution.
+
+% TODO: link this back to behavior of a real trader
 
 We hypothesized that looking back at previous utilities would help break out of a downward spiral.
 The idea is that if a trader has lost significant utility, they might have ended up over-constrained.
 By backtracking to an earlier constraint when they had higher utility, the trader could try to recover.
 We believe that looking back at different time intervals could capture both recent and historic mistakes.
-Constraints that were positive expected utility when introduced, but have become too tight due to the actions of other traders probably occurred long ago.
-Constraints that were never positive expected utility, but just randomly gave a good result probably occurred recently and should be corrected quickly.
+Constraints that had positive expected utility when introduced, but have become too tight due to the actions of other traders, probably occurred long ago.
+Constraints that never had positive expected utility, but just randomly gave a good result, probably occurred recently and should be corrected quickly.
 Because of this, we believed that combination of short and long term backtrack positions would give the best results.
 
 To implement backtracking, each trader keeps track of their past utilities and constraint values.
@@ -597,10 +624,9 @@ At every day, they look backwards at their utility gains $x$ days in the past fo
 If their utility gain has fallen below the threshold since that day in the past, they will reset their constraint to what it was on that day with backtrack probability.
 
 We tested a variety of different backtrack positions, probabilities and thresholds on a small trial size so we could explore a wider parameter space.
-For all of the backtrack tests, we used mean constraint choice and mean reversion.
+For all of the backtrack tests, we used \co{mean} constraint choice and \co{mean} reversion.
 The specific backtrack positions did not seem to have much effect; for instance, backtracking at 4 is quite similar to backtracking at 9. 
 Because of that, we ended up picking the values of 5, 25 and 100 to represent small, medium, and large backtracks, and only testing those.
-The results from those are in APPENDIX.
 From them, we selected a subset to run full size trials.
 A 99\% threshold provided the highest quality results with no significant decrease in speed, so we use that level from here on.
 We chose to run the full tests on probabilities of 50\%, 75\% and 100\%, and backtracks of 5, 25, 5-25 and 5-25-100. 
@@ -609,9 +635,9 @@ Overall, backtracking is a big improvement over the naive constraint choice.
 The results can be found in Table \ref{tab:bt2}.
 Even the worst performing backtrack model had 83\% convergence and 16\% divergence.
 The best model, with probability 50\% and backtracks at 5, 25, and 100 had 100\% convergence, with 34k average trades per trader until convergence.
-Another model (just a single 25 backtrack) also had 100\% convergence, but was slower, with 49k trades until convergence.
-The 50\%-5-25-100 model was only 29\% slower than the mean-mean model without backtracks, but it had much higher rate of convergence, and lower wealth transfers.
-Both of these were faster and had higher convergence ratios than the mean-random model in Table \ref{tab:simple}.
+Another model (just a single 25-day backtrack) also had 100\% convergence, but was slower, with 49k trades until convergence.
+The 50\%-5-25-100 model was only 29\% slower than the simple \co{mean}-\co{mean} model without backtracks, but it had much higher rate of convergence, and lower wealth transfers.
+Both of these were faster and had higher convergence ratios than the \co{mean}-\co{random} model in Table \ref{tab:simple}.
 
 The high convergence percentage, with only 3.5\% wealth transfers and tight MRS convergence, makes this version of the algorithm a feasible approximation of the centralized methods. 
 Backtracking greatly reduces the risk of divergence, which was the main issue in getting a decentralized program to be useful.
@@ -645,22 +671,23 @@ Stability is a desirable property for any random simulation of a event.
 If the results are very sensitive to the source of randomness, it casts doubt on whether the results reflect the parameters well.
 In our case, we want the outcome to be sensitive to the endowments, but not the random pairs chosen to trade or the random backtracks that occur. 
 To test this, we generated one set of endowments and ran many trials with different seeds on the same endowments.
-We tried this with mean-mean in both convergent and divergent cases, as well as with the 50\%-5-25-100 backtracking model.
+We tried this with \co{mean}-\co{mean} in both convergent and divergent cases, as well as with the 50\%-5-25-100 backtracking model.
+We then calculated the standard deviations of the statistics, as well as the convergence and divergence percentages.
 
-% TODO: rerun this with standard deviations
-
-The results, in Table \ref{tab:stable}, show that the statistics are stable across different starting seeds.
-The convergent allocations continued to converge 100\% of the time, and the divergent allocation did so 100\% of the time too.
+The results, in Table \ref{tab:stable}, show that the statistics are very stable across different starting seeds.
+The convergent allocations continued to converge 100\% of the time, and the divergent allocation did so 100\% of the time, too.
+The standard deviations of the statistics were very low.
+For backtracking, the final utility gain was had a mean of 0.309 and a standard deviation of 0.001, which shows it gave very consistent results across seeds.
 It is encouraging that the best backtracking model remained stable, because that suggests that it could be safely used for simulating an allocation in practice.
 
 \begin{table}[h]
   \begin{tabular}{l|rr|rrrr}
-    & \multicolumn{1}{l}{} & \multicolumn{1}{l}{} & \multicolumn{ 4}{|c}{After 500 Days} \\ 
+    & \multicolumn{1}{l}{} & \multicolumn{1}{l}{} & \multicolumn{ 4}{|c}{Standard Deviations (After 500 Days)} \\ 
     Experiment & \multicolumn{1}{l}{Div.} & \multicolumn{1}{l|}{Conv.} & \multicolumn{1}{l}{Wealth} & \multicolumn{1}{l}{Utility} & \multicolumn{1}{l}{MRS Dev.} & \multicolumn{1}{l}{Trades} \\ 
     \hline
-    Backtrack & 0\% & 100\% & 0.030 & 0.309 & 0.003 & 92,882 \\ 
-    Simple Conv. & 0\% & 100\% & 0.026 & 0.301 & 0.008 & 78,726 \\ 
-    Simple Div. & 100\% & 0\% & 0.003 & 0.064 & 0.117 & 33,824 \\ 
+    Backtrack & 0\% & 100\% & 0.002 & 0.001 & 0.001 & 6019 \\ 
+    Simple Conv. & 0\% & 100\% & 0.002 & 0.008 & 0.006 & 7907 \\ 
+    Simple Div. & 100\% & 0\% & 0.003 & 0.045 & 0.108 & 9026 \\ 
   \end{tabular}
   \caption{Stability over multiple seeds with same allocation}
   \label{tab:stable}
@@ -682,15 +709,15 @@ There is even the possibility of using non-deterministic utility functions, wher
 This would work fine with the relaxed model as long as the queries were deterministic within individual trades.
 For example, if the oracle says a trade is plus-utility, and so it is accepted, then it must lead to a gain in utility, even if the same terms are rejected on another day.
 
-We tested this lower-information model with the mean-mean constraint model.
+We tested this lower-information model with the \co{mean}-\co{mean} constraint model.
 We tuned two parameters differently to maximize performance. 
 First, we changed the minimum trade size from $10^{-4}$ to $10^{-7}$.
-Note that since the sizes expand geometrically as long as they are plus-utility, this is only $3 \; \log_2 10$ more steps per trade, rather than $10^3$.
+Note that since the trade size expands geometrically as long as it increases utility, this is only $3 \; \log_2 10$ more steps per trade, rather than $10^3$.
 We also increased the finish count from 1 to numbers between 10 and 50.
 This meant that the model would wait for more empty trades before finishing a day.
-This was necessary because the ratio of successful to empty trades is so much lower when the candidate MRS is chose randomly.
+This was necessary because the ratio of successful to empty trades is so much lower when the candidate MRS is chosen randomly.
 
-%TODO: rerun with larger trial size
+%TODO: add data from larger trial size
 
 After testing on a variety of finish counts, we can conclude that the algorithm gives broadly similar results without gradients. 
 The non-gradients version has similar utility gains and lower (better) wealth transfers than the version with gradients.
@@ -725,46 +752,40 @@ If we were using one of these models for a real simulation, we would re-examine 
 \subsection{Evaluation}
 This project is a step towards better calculation of Walrasian equilibria via bilateral trade.
 We implemented a simulation framework that can test different models of constrained bilateral trade.
-We addressed a significant issue with the constraint-learning method of calculation with the novel addition of backtracking.
-The model behaves the same on a fixed set of allocations across different seeds of the random number generator.
-This framework can be extended to a version without access to gradients.
+To address a significant issue with the constraint-learning method of calculation, we made the novel addition of backtracking.
+We showed that the model behaves the same on a fixed set of allocations across different sequences of random trades.
+We demonstrated that this framework can be extended to a version without access to gradients.
 
-The main advantage of the techniques in this project over the existing methods available is that the information requirements are much lower. 
-We do not assume that there is a central auctioneer who can query everyone's preferences at the same time.
-This would be unrealistic in many real world markets.
-
-We unfortunately do not have an easy way of comparing the efficiency of the two since we did not test any other methods on the same hardware, and our metric of attempted trades is not defined for the centralized methods.
+We do not have an easy way of comparing the efficiency of our techniques with the centralized methods since our metric of attempted trades is not defined for them.
+We did not have time to reimplement those methods in the same language and test on the same hardware, so we could not compare running times either.
+Still, even if our method were much slower, it would provide insight into the way decentralized markets function in the real world.
 
 The wealth transfer in our best model is still about 3\%.
 While this is significantly better than the 10\% initial wealth transfer, it means that this is only a very broad approximation of a WE.
 
+The main advantage of the techniques in this project over the existing methods available is that they don't rely on central sources of information.
+We do not assume that there is a central auctioneer who can query everyone's preferences at the same time.
+For many interesting real-world markets, that assumption would be unrealistic.
+This project makes it easier to analyse the dynamics of competitive markets built around interacting traders.
+The case of divergence shows that markets can break down in unexpected ways, even given reasonable behaviour from all the participants.
+
 % TODO: expand and cite
-
-% We can say that our approach is linear in the number of traders. 
-% This is supported experimentally by running experiments on different numbers of traders.
-% The results for the mean-mean simulation on 50 to 500 traders are displayed in TABLE.
-% This reflects the intuition that more traders doesn't change the average number of trades a given trader must interact with.
-% Because the trading pairs were randomized to begin with, a trader is indifferent to where the others traders come from.
-
-
 
 \subsection{Future Work}
 It would be very useful to compare this directly to the centralized ways of calculating Walrasian equilibria.
 In particular, the utility gains from the actual equilibrium could be compared with the simulated results.
-If it was implemented in the same language, running time could also be compared in practice.
+If it were implemented in the same language, running time could also be compared in practice.
 
-We would like to test our model against a wider variety of utility functions, since it theoretically has the capability to simulate them.
-In particular, Leontief economies would be an interesting choice because they sometimes do not have exact equilibria.
+We would like to test our model against a wider variety of utility functions, since it has the capability to simulate them.
+In particular, the Leontief utility function would be an interesting choice because markets using it do not necessarily have exact equilibria.
 
 Further work to improve the quality of approximation is critical to using this in practice.
-Without any constraints, the markets tend to converge around 10\% transfer. 
+Without any constraints, the markets tend to have around 10\% wealth transfer. 
 Reduction to a third of that is valuable, but not impressive enough to warrant using this technique as it stands.
 
-We only focused on the very simple case of two goods.
-Every centralized model supports more goods, which is more realistic.
-We believe this could be expanded to more goods, but it would take a substantial change to the code and was such outside the scope of the project.
-
-
+We also only focused on the very simple case of two goods.
+Every centralized model supports more goods, which is more typical of real world markets.
+We believe this could be expanded to more goods, but it would take a substantial change to the code and was thus outside the scope of the project.
 
 \section{Acknowledgements}\label{acknowledgements}
 I would like to thank my supervisor, Paul Goldberg, for the original idea for this project and for all his advice along the way.
@@ -772,8 +793,6 @@ I would like to thank my supervisor, Paul Goldberg, for the original idea for th
 I would also like to thank my tutor, Professor Thomas Melham, for reviewing a draft of this report.
 
 \printbibliography
-
-% TODO: add appendix
 
 \end{document}
 

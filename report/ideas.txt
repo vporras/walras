@@ -1,7 +1,5 @@
 todo before draft
 =================
-  finish results for multiple utility
-
   inline todos
 
   check tenses
@@ -11,7 +9,6 @@ todo before draft
 
   regenerate figures with latex
   http://bkanuka.com/articles/native-latex-plots/
-  appendices
 
       
 questions
