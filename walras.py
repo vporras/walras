@@ -54,28 +54,6 @@ import matplotlib.pyplot as plt
 def savefig(filename):
     plt.savefig('{}.pgf'.format(filename), bbox_inches="tight")
 
-
-# Simple plot
-# fig, ax  = newfig(0.6)
-
-# def ema(y, a):
-#     s = []
-#     s.append(y[0])
-#     for t in range(1, len(y)):
-#         s.append(a * y[t] + (1-a) * s[t-1])
-#     return np.array(s)
-    
-# y = [0]*200
-# y.extend([20]*(1000-len(y)))
-# s = ema(y, 0.01)
-
-# ax.plot(s)
-# ax.set_xlabel('X Label')
-# ax.set_ylabel('EMA')
-
-
-
-
 #####
 
 class Dir(Enum):
@@ -328,35 +306,38 @@ class Trader():
             
         return size
         
-    def plot(self, rows, index):
+    def plot(self, ax, rows):
         alpha = self.preference
         xlist = np.linspace(0, 1.0, 100)
         ylist = np.linspace(0, 1.0, 100)
         X1, X2 = np.meshgrid(xlist, ylist)
         U = np.array([[self.utility((x, y)) for x in xlist] for y in ylist])
 
-        plt.subplot(rows, 1, index)
-        cp = plt.contour(X1, X2, U, colors="g")
-        plt.clabel(cp, inline=True, fontsize=10)
-        plt.title("trader: %s, alpha = %f" % (self.name, alpha))
-        plt.xlabel("Good 1")
-        plt.ylabel("Good 2")
+        # if index == 1:
+        #     plt.subplot(rows, 1, 1)
+        # else:
+        #     ax.subplot(rows, 2, index + 1)
+        cp = ax.contour(X1, X2, U, colors="g")
+        ax.clabel(cp, inline=True, fontsize=10)
+        ax.set_title("Trader %s, $\\alpha$ = %0.2f" % (self.name, alpha))
+        ax.set_xlabel("Good 1")
+        ax.set_ylabel("Good 2")
         
         x1s, x2s = zip(*self.allocs)
-        plt.plot(x1s, x2s, ".-")
+        ax.plot(x1s, x2s, ".-")
         x1, x2 = self.alloc
-        plt.plot([x1], [x2], "ro")
+        ax.plot([x1], [x2], "ro")
 
         buyX = np.linspace(x1, x1 + .1, 5)
         buyY = x2 + (buyX - x1) * -self.mrs(Dir.buy)  
-        plt.plot(buyX, buyY, "--b")
+        ax.plot(buyX, buyY, "--b")
 
         sellX = np.linspace(x1 - .1, x1, 5)
         sellY = x2 + (sellX - x1) * -self.mrs(Dir.sell)  
-        plt.plot(sellX, sellY, "--r")
+        ax.plot(sellX, sellY, "--r")
 
-        plt.xlim(0, 1)
-        plt.ylim(0, 1)
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
         
     def __str__(self):
         return ("Name:{name},\n alpha=({preference}),\n alloc=({alloc})".format(
@@ -409,13 +390,26 @@ def do_round(config, traders, round):
         print("du:  ", pretty(du))
 
     if config.plotting >= 2 and is_last or config.plotting >= 3:
-        plt.figure("allocations (seed %d)" % config.seed, figsize=figsize(1.2, 1.0))
+        plt.figure("allocations (seed %d)" % config.seed, figsize=figsize(1.23, 1.2))
 
         # only plot first 4 traders due to screen size
         n_to_plot = min(len(traders), 4)
+
+        gs = plt.GridSpec(2, 2, height_ratios=[2, 1], hspace=0.25, wspace=0.1)
+
+        ax = []
+        
+        ax.append(plt.subplot(gs.new_subplotspec([0, 0], 1, 2)))
+        ax.append(plt.subplot(gs[1, 0]))
+        ax.append(plt.subplot(gs[1, 1]))
+
         for i, t in enumerate(traders[:n_to_plot]):
-            t.plot(n_to_plot, i + 1)
-        plt.subplots_adjust(hspace=.3, bottom=.05, top=.95)
+            t.plot(ax[i], n_to_plot)
+
+
+        ax[2].set_ylabel("")
+        ax[2].set_yticklabels(())
+        # plt.subplots_adjust(hspace=.5, bottom=.4, top=1.0)
 
         savefig("report/images/allocations_seed_%d" % config.seed)
         # plt.show()
