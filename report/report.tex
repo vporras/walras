@@ -6,6 +6,7 @@
 \documentclass[12pt,a4paper,titlepage]{article}
 \usepackage[style=numeric,backend=bibtex,firstinits=true,maxbibnames=99]{biblatex}
 \usepackage{graphicx}
+\usepackage{pgf}
 \usepackage{enumitem}
 \usepackage{amssymb}
 \usepackage[utf8]{inputenc}
@@ -275,7 +276,7 @@ We do adjust that parameter when we get to the no-gradient case in Section \ref{
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=\textwidth]{allocations_(seed_13).png}
+    \input{images/allocations_seed_13.pgf}
     \caption{
       A single trading day for three traders.
       The green contours are lines of equal utility.
@@ -438,7 +439,7 @@ They are displayed in charts like that in Figure \ref{fig:conv}.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=\textwidth]{seed_5.png}
+    \input{images/rounds_seed_5.pgf}
     \caption{
       Convergence for 100 traders.
       Notice how all the statistics stabilize, and MRS deviation is small.
@@ -469,7 +470,7 @@ The advantage of recording them at the end is that they can be compared across c
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=\textwidth]{seed_0.png}
+    \input{images/rounds_seed_0_div.pgf}
     \caption{
       Divergence for 100 traders.
       Notice how utility falls around day 100 and MRS deviation increases dramatically.
@@ -596,7 +597,17 @@ Based on these observations, we decided to focus on improving the convergence of
 
 
 \subsection{Backtracking}\label{backtrack}
-% TODO: add figure of convergence with backtracking. Possible s=0 from above?
+
+\begin{figure}[H]
+    \centering
+    \input{images/rounds_seed_0.pgf}
+    \caption{
+      Convergence for 100 traders using backtracking at 5-25-100.
+      This uses the same allocations and preferences as \ref{fig:div}.
+      Notice how constrainedness is no longer monotonic, and utility stays high.
+    }
+    \label{fig:back}
+\end{figure}
 
 The main novel idea in this paper is the application of backtracking to this problem.
 Backtracking means looking at past constraints, and if they gave better utility, switching to them with some positive probability.
@@ -638,6 +649,9 @@ The best model, with probability 50\% and backtracks at 5, 25, and 100 had 100\%
 Another model (just a single 25-day backtrack) also had 100\% convergence, but was slower, with 49k trades until convergence.
 The 50\%-5-25-100 model was only 29\% slower than the simple \co{mean}-\co{mean} model without backtracks, but it had much higher rate of convergence, and lower wealth transfers.
 Both of these were faster and had higher convergence ratios than the \co{mean}-\co{random} model in Table \ref{tab:simple}.
+
+
+Figure \ref{fig:back} shows the effect of backtracking on the same allocations and preferences as Figure \ref{fig:div}; it eliminates the divergence.
 
 The high convergence percentage, with only 3.5\% wealth transfers and tight MRS convergence, makes this version of the algorithm a feasible approximation of the centralized methods. 
 Backtracking greatly reduces the risk of divergence, which was the main issue in getting a decentralized program to be useful.

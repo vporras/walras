@@ -1,6 +1,5 @@
 import numpy as np
 import random
-import matplotlib.pyplot as plt
 import argparse
 import sys
 import os
@@ -12,11 +11,72 @@ from enum import Enum
 from operator import itemgetter
 
 
-warnings.simplefilter("error")
+# warnings.simplefilter("error")
 
 BUY_CONSTRAINT = 10
 SELL_CONSTRAINT = 0.1
 DYNAMIC = True
+
+##### Latex Plotting
+import matplotlib as mpl
+mpl.use('pgf')
+
+def figsize(scale, ratio):
+    fig_width_pt = 390                          # Get this from LaTeX using \the\textwidth
+    inches_per_pt = 1.0/72.27    
+    
+    fig_width = fig_width_pt*inches_per_pt*scale    # width in inches
+    fig_height = fig_width*ratio              # height in inches
+    fig_size = [fig_width,fig_height]
+    return fig_size
+
+pgf_with_latex = {                      # setup matplotlib to use latex for output
+    "pgf.texsystem": "pdflatex",        # change this if using xetex or lautex
+    "text.usetex": True,                # use LaTeX to write all text
+    "font.family": "serif",
+    "font.serif": [],                   # blank entries should cause plots to inherit fonts from the document
+    "font.sans-serif": [],
+    "font.monospace": [],
+    "axes.labelsize": 12,               # LaTeX default is 10pt font.
+    "text.fontsize": 12,
+    "legend.fontsize": 10,               # Make the legend/label fonts a little smaller
+    "xtick.labelsize": 10,
+    "ytick.labelsize": 10,
+    "pgf.preamble": [
+        r"\usepackage[utf8x]{inputenc}",    # use utf8 fonts becasue your computer can handle it :)
+        r"\usepackage[T1]{fontenc}",        # plots will be generated using this preamble
+        ]
+}
+mpl.rcParams.update(pgf_with_latex)
+
+import matplotlib.pyplot as plt
+
+def savefig(filename):
+    plt.savefig('{}.pgf'.format(filename), bbox_inches="tight")
+
+
+# Simple plot
+# fig, ax  = newfig(0.6)
+
+# def ema(y, a):
+#     s = []
+#     s.append(y[0])
+#     for t in range(1, len(y)):
+#         s.append(a * y[t] + (1-a) * s[t-1])
+#     return np.array(s)
+    
+# y = [0]*200
+# y.extend([20]*(1000-len(y)))
+# s = ema(y, 0.01)
+
+# ax.plot(s)
+# ax.set_xlabel('X Label')
+# ax.set_ylabel('EMA')
+
+
+
+
+#####
 
 class Dir(Enum):
     """Direction of trade in terms of good 1"""
@@ -349,14 +409,16 @@ def do_round(config, traders, round):
         print("du:  ", pretty(du))
 
     if config.plotting >= 2 and is_last or config.plotting >= 3:
-        plt.figure("allocations (seed %d)" % config.seed, figsize=(8, 12))
+        plt.figure("allocations (seed %d)" % config.seed, figsize=figsize(1.2, 1.0))
 
         # only plot first 4 traders due to screen size
         n_to_plot = min(len(traders), 4)
         for i, t in enumerate(traders[:n_to_plot]):
             t.plot(n_to_plot, i + 1)
         plt.subplots_adjust(hspace=.3, bottom=.05, top=.95)
-        plt.show()
+
+        savefig("report/images/allocations_seed_%d" % config.seed)
+        # plt.show()
 
     return res
 
@@ -515,20 +577,23 @@ def do_trial(config, results):
         # utilities /= config.num_traders / 5
 
 
-        plt.figure("seed %d" % config.seed, figsize=(10,8))
-        plt.plot(wealths,         label="wealth transfers (%)")
-        plt.plot(utilities,       label="utility gains (%)")
-        plt.plot(mrs_deviation,   label="mrs deviation")
-        plt.plot(constrainedness, label="constrainedness (%)")
+        plt.figure("seed %d" % config.seed, figsize=figsize(1.2, 0.8))
+        plt.plot(wealths,         label="Wealth Transfers (%)")
+        plt.plot(utilities,       label="Utility Gains (%)")
+        plt.plot(mrs_deviation,   label="MRS Deviation")
+        plt.plot(constrainedness, label="Constrainedness (%)")
 
     
         ax = plt.gca()
         cur = ax.get_position()
         ax.set_position([cur.x0, cur.y0 + cur.height * 0.1, cur.width, cur.height * 0.9])
 
-        ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05), ncol=2)
+        ax.legend(loc='upper right', bbox_to_anchor=(0.95, 0.95), ncol=1)
 
-        plt.show()
+        ax.set_xlabel('Day')
+        
+
+        savefig("report/images/rounds_seed_%d" % config.seed)
 
 def run(config):
     results = mp.Queue()
