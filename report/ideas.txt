@@ -1,27 +1,8 @@
-todo before draft
-=================
-  inline todos
-
-  check tenses
-  https://www.ece.ucdavis.edu/~jowens/commonerrors.html
-  
-  In general, we like to see reasoning behind th design choices you have made. This shows you are being thoughtful and deliberate, and provides insight into the techniques.
-
+todo
+====
   regenerate figures with latex
   http://bkanuka.com/articles/native-latex-plots/
-
       
-questions
-=========
-  should constrainedness be flipped?
-  the word "model"
-    -- what do I call a set of parameters? experimental setup?
-  are the table column names clear enough?
-  can I say backtracking is novel?
-  he/her/they for traders
-
-
-
 time metrics
 ============
   wall clock for comparison with 
